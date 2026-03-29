@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>MiniTube</title>
+<style>
+body {
+    font-family: Arial;
+    background: #0f0f0f;
+    color: white;
+    margin: 0;
+}
+header {
+    background: #202020;
+    padding: 15px;
+    font-size: 24px;
+}
+.container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+    padding: 15px;
+}
+.video {
+    background: #181818;
+    padding: 10px;
+    border-radius: 10px;
+}
+iframe {
+    width: 100%;
+    height: 180px;
+    border-radius: 10px;
+}
+.title {
+    margin-top: 8px;
+}
+</style>
+</head>
+
+<body>
+
+<header>🔥 MiniTube</header>
+
+<div class="container">
+
+<div class="video">
+<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe>
+<div class="title">Пример видео 1</div>
+</div>
+
+<div class="video">
+<iframe src="https://www.youtube.com/embed/3JZ_D3ELwOQ"></iframe>
+<div class="title">Пример видео 2</div>
+</div>
+
+<div class="video">
+<iframe src="https://www.youtube.com/embed/tgbNymZ7vqY"></iframe>
+<div class="title">Пример видео 3</div>
+</div>
+
+</div>
+
+</body>
+  </html>
