@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>MiniTube</title>
+
 <style>
 body {
     font-family: Arial;
@@ -10,55 +11,92 @@ body {
     color: white;
     margin: 0;
 }
+
 header {
     background: #202020;
     padding: 15px;
     font-size: 24px;
+    display: flex;
+    justify-content: space-between;
 }
+
+input {
+    padding: 5px;
+    border-radius: 5px;
+    border: none;
+}
+
 .container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 15px;
     padding: 15px;
 }
+
 .video {
     background: #181818;
     padding: 10px;
     border-radius: 10px;
+    transition: 0.2s;
 }
+
+.video:hover {
+    transform: scale(1.03);
+}
+
 iframe {
     width: 100%;
     height: 180px;
     border-radius: 10px;
 }
+
 .title {
     margin-top: 8px;
 }
 </style>
+
 </head>
 
 <body>
 
-<header>🔥 MiniTube</header>
+<header>
+🔥 MiniTube
+<input type="text" id="search" placeholder="Поиск...">
+</header>
 
-<div class="container">
+<div class="container" id="videos"></div>
 
-<div class="video">
-<iframe src="https://www.youtube.com/embed/Rkwo_U-ARl8"></iframe>
-<div class="title">Марин видео</div>
-</div>
+<script>
+const videoData = [
+    { id: "Rkwo_U-ARl8", title: "Марин видео" },
+    { id: "tgbNymZ7vqY", title: "Пример видео 2" },
+    { id: "ysz5S6PUM-U", title: "Пример видео 3" }
+];
 
-<div class="video">
-<iframe src="https://www.youtube.com/embed/Rkwo_U-ARl8"></iframe>
-<div class="title">Пример видео 2</div>
-</div>
+const container = document.getElementById("videos");
+const search = document.getElementById("search");
 
-<div class="video">
-<iframe src="https://www.youtube.com/embed/tgbNymZ7vqY"></iframe>
-<div class="title">Пример видео 3</div>
-</div>
+function renderVideos(list) {
+    container.innerHTML = "";
+    list.forEach(v => {
+        container.innerHTML += `
+        <div class="video">
+            <iframe src="https://www.youtube.com/embed/${v.id}"></iframe>
+            <div class="title">${v.title}</div>
+        </div>
+        `;
+    });
+}
 
-</div>
+search.addEventListener("input", () => {
+    const filtered = videoData.filter(v =>
+        v.title.toLowerCase().includes(search.value.toLowerCase())
+    );
+    renderVideos(filtered);
+});
+
+renderVideos(videoData);
+</script>
 
 </body>
-  </html>
+</html>
