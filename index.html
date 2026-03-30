@@ -341,6 +341,15 @@
       display: grid;
       place-items: center;
       font-weight: 700;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
     .video-title {
@@ -642,7 +651,7 @@
       <section class="section hidden" id="addPage">
         <div class="form-card">
           <h2>Добавить новое видео</h2>
-          <p class="hint">Поддерживается обычная ссылка YouTube, короткая ссылка youtu.be и прямая вставка ID видео.</p>
+          <p class="hint">Поддерживается обычная ссылка YouTube, короткая ссылка youtu.be и прямая вставка ID видео. Аватар можно указать вручную ссылкой или подтягивать автоматически через YouTube Data API, если добавить API-ключ в код.</p>
           <form id="videoForm" class="form-grid">
             <label>
               Название видео
@@ -652,6 +661,11 @@
             <label>
               Автор / канал
               <input type="text" id="channelInput" required placeholder="Например: Marin Channel" />
+            </label>
+
+            <label>
+              Аватар автора \(URL, необязательно\)
+              <input type="text" id="avatarInput" placeholder="https://site.com/avatar.jpg" />
             </label>
 
             <label class="full">
@@ -746,9 +760,11 @@
 
   <script>
     const STORAGE_KEYS = {
-      videos: 'minitube_videos_v2',
-      user: 'minitube_user_v2'
+      videos: 'minitube_videos_v3',
+      user: 'minitube_user_v3'
     };
+
+    const YOUTUBE_API_KEY = ''; // Вставь сюда ключ YouTube Data API v3, если хочешь автозагрузку аватаров канала
 
     const defaultVideos = [
       {
@@ -756,6 +772,7 @@
         youtubeId: 'Rkwo_U-ARl8',
         title: 'Марин видео',
         channel: 'Marin Channel',
+        avatar: 'https://i.pravatar.cc/100?img=1',
         description: 'Демо-видео для стартовой главной страницы MiniTube.',
         category: 'Развлечения',
         duration: '6:21',
@@ -766,6 +783,7 @@
         youtubeId: 'ysz5S6PUM-U',
         title: 'Пример видео 2',
         channel: 'Demo Creator',
+        avatar: 'https://i.pravatar.cc/100?img=12',
         description: 'Второй ролик для примера карточек и отдельной страницы просмотра.',
         category: 'Музыка',
         duration: '3:52',
@@ -776,6 +794,7 @@
         youtubeId: 'ScMzIvxBSi4',
         title: 'Пример видео 3',
         channel: 'Code Studio',
+        avatar: 'https://i.pravatar.cc/100?img=22',
         description: 'Третий ролик: можно искать, открывать и удалять.',
         category: 'Обучение',
         duration: '10:08',
@@ -818,6 +837,7 @@
       urlInput: document.getElementById('urlInput'),
       categoryInput: document.getElementById('categoryInput'),
       durationInput: document.getElementById('durationInput'),
+      avatarInput: document.getElementById('avatarInput'),
       descriptionInput: document.getElementById('descriptionInput'),
 
       loginForm: document.getElementById('loginForm'),
@@ -885,6 +905,35 @@
       return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
     }
 
+    function avatarMarkup(video, size = 40) {
+      if (video.avatar) {
+        return `<div class="avatar" style="width:${size}px;height:${size}px;"><img src="${escapeHtml(video.avatar)}" alt="${escapeHtml(video.channel)}"></div>`;
+      }
+      return `<div class="avatar" style="width:${size}px;height:${size}px;">${escapeHtml(initials(video.channel))}</div>`;
+    }
+
+    async function fetchChannelAvatarByVideoId(youtubeId) {
+      if (!YOUTUBE_API_KEY) return null;
+      try {
+        const videoRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${youtubeId}&key=${YOUTUBE_API_KEY}`);
+        const videoData = await videoRes.json();
+        const item = videoData.items && videoData.items[0];
+        const channelId = item && item.snippet && item.snippet.channelId;
+        if (!channelId) return null;
+
+        const channelRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${YOUTUBE_API_KEY}`);
+        const channelData = await channelRes.json();
+        const channelItem = channelData.items && channelData.items[0];
+        return channelItem?.snippet?.thumbnails?.high?.url
+          || channelItem?.snippet?.thumbnails?.medium?.url
+          || channelItem?.snippet?.thumbnails?.default?.url
+          || null;
+      } catch (error) {
+        console.error('Не удалось загрузить аватар канала:', error);
+        return null;
+      }
+    }
+
     function formatDate(dateStr) {
       const d = new Date(dateStr);
       return d.toLocaleDateString('ru-RU', {
@@ -940,7 +989,7 @@
             <div class="duration">${escapeHtml(v.duration || '—')}</div>
           </div>
           <div class="card-body">
-            <div class="avatar">${escapeHtml(initials(v.channel))}</div>
+            ${avatarMarkup(v)}
             <div>
               <h3 class="video-title">${escapeHtml(v.title)}</h3>
               <div class="meta">${escapeHtml(v.channel)}</div>
@@ -1038,7 +1087,11 @@
       els.watchChannel.textContent = video.channel;
       els.watchInfo.textContent = `${video.category || 'Все'} • ${video.duration || '—'} • ${formatDate(video.createdAt)}`;
       els.watchDescription.textContent = video.description || 'Описание отсутствует.';
-      els.watchAvatar.textContent = initials(video.channel);
+      if (video.avatar) {
+        els.watchAvatar.innerHTML = `<img src="${escapeHtml(video.avatar)}" alt="${escapeHtml(video.channel)}">`;
+      } else {
+        els.watchAvatar.textContent = initials(video.channel);
+      }
 
       const recommended = state.videos.filter(v => v.id !== id).slice(0, 8);
       els.recommendedList.innerHTML = recommended.map(v => `
@@ -1079,7 +1132,7 @@
       }
     }
 
-    function handleAddVideo(e) {
+    async function handleAddVideo(e) {
       e.preventDefault();
       const youtubeId = getYouTubeId(els.urlInput.value);
 
@@ -1092,13 +1145,19 @@
       const channel = els.channelInput.value.trim();
       const description = els.descriptionInput.value.trim();
       const category = els.categoryInput.value;
+      let avatar = els.avatarInput.value.trim();
       const duration = els.durationInput.value.trim() || 'Новое';
+
+      if (!avatar) {
+        avatar = await fetchChannelAvatarByVideoId(youtubeId) || '';
+      }
 
       const newVideo = {
         id: crypto.randomUUID(),
         youtubeId,
         title,
         channel,
+        avatar,
         description,
         category,
         duration,
