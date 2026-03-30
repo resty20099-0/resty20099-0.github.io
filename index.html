@@ -664,7 +664,12 @@
             </label>
 
             <label>
-              Аватар автора \(URL, необязательно\)
+              Аватар автора (загрузка файла)
+              <input type="file" id="avatarFileInput" accept="image/*" />
+            </label>
+
+            <label>
+              Или ссылка на аватар (необязательно)
               <input type="text" id="avatarInput" placeholder="https://site.com/avatar.jpg" />
             </label>
 
@@ -838,6 +843,7 @@
       categoryInput: document.getElementById('categoryInput'),
       durationInput: document.getElementById('durationInput'),
       avatarInput: document.getElementById('avatarInput'),
+      avatarFileInput: document.getElementById('avatarFileInput'),
       descriptionInput: document.getElementById('descriptionInput'),
 
       loginForm: document.getElementById('loginForm'),
@@ -1145,8 +1151,22 @@
       const channel = els.channelInput.value.trim();
       const description = els.descriptionInput.value.trim();
       const category = els.categoryInput.value;
-      let avatar = els.avatarInput.value.trim();
       const duration = els.durationInput.value.trim() || 'Новое';
+
+      let avatar = '';
+
+      const file = els.avatarFileInput.files[0];
+      if (file) {
+        avatar = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (!avatar) {
+        avatar = els.avatarInput.value.trim();
+      }
 
       if (!avatar) {
         avatar = await fetchChannelAvatarByVideoId(youtubeId) || '';
