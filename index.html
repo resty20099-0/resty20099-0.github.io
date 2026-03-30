@@ -1,102 +1,1193 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>MiniTube</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniTube Pro</title>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --panel: #181818;
+      --panel-2: #202020;
+      --panel-3: #272727;
+      --text: #f1f1f1;
+      --muted: #aaaaaa;
+      --accent: #ff0000;
+      --accent-2: #cc0000;
+      --border: #303030;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
 
-<style>
-body {
-    font-family: Arial;
-    background: #0f0f0f;
-    color: white;
-    margin: 0;
-}
+    * { box-sizing: border-box; }
 
-header {
-    background: #202020;
-    padding: 15px;
-    font-size: 24px;
-    display: flex;
-    justify-content: space-between;
-}
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      min-height: 100%;
+    }
 
-input {
-    padding: 5px;
-    border-radius: 5px;
-    border: none;
-}
+    a { color: inherit; text-decoration: none; }
+    button, input, textarea {
+      font: inherit;
+    }
 
-.container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 15px;
-    padding: 15px;
-}
+    .app {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
 
-.video {
-    background: #181818;
-    padding: 10px;
-    border-radius: 10px;
-    transition: 0.2s;
-}
+    .sidebar {
+      background: #111;
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
 
-.video:hover {
-    transform: scale(1.03);
-}
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 22px;
+    }
 
-iframe {
-    width: 100%;
-    height: 180px;
-    border-radius: 10px;
-}
+    .brand-badge {
+      background: var(--accent);
+      padding: 8px 12px;
+      border-radius: 12px;
+      line-height: 1;
+    }
 
-.title {
-    margin-top: 8px;
-}
-</style>
+    .nav {
+      display: grid;
+      gap: 8px;
+    }
 
+    .nav button {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: .2s ease;
+    }
+
+    .nav button:hover,
+    .nav button.active {
+      background: var(--panel-3);
+      border-color: var(--border);
+    }
+
+    .content {
+      min-width: 0;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(15,15,15,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .top-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    .search-wrap {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      max-width: 720px;
+      gap: 8px;
+    }
+
+    .search-wrap input {
+      flex: 1;
+      background: #121212;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 13px 14px;
+      border-radius: 999px;
+      outline: none;
+    }
+
+    .search-wrap input:focus {
+      border-color: #4d90fe;
+    }
+
+    .chip-btn, .primary-btn, .ghost-btn, .danger-btn {
+      border: none;
+      cursor: pointer;
+      transition: .2s ease;
+      border-radius: 999px;
+      padding: 11px 16px;
+      color: white;
+    }
+
+    .chip-btn { background: var(--panel-3); }
+    .chip-btn:hover { filter: brightness(1.12); }
+
+    .primary-btn {
+      background: var(--accent);
+    }
+    .primary-btn:hover {
+      background: var(--accent-2);
+    }
+
+    .ghost-btn {
+      background: var(--panel-3);
+    }
+
+    .danger-btn {
+      background: #5c1d1d;
+    }
+
+    .top-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .user-pill {
+      padding: 10px 14px;
+      background: var(--panel-3);
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .section {
+      padding: 18px 16px 32px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #1f1f1f, #121212);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 680px;
+      line-height: 1.5;
+    }
+
+    .stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 14px;
+      min-width: 120px;
+    }
+
+    .stat .n {
+      display: block;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .filters {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .filter-chip {
+      background: var(--panel-3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    .filter-chip.active {
+      background: var(--text);
+      color: #111;
+      border-color: transparent;
+    }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 18px;
+    }
+
+    .video-card {
+      background: transparent;
+      border-radius: 18px;
+      overflow: hidden;
+      transition: transform .18s ease;
+    }
+
+    .video-card:hover {
+      transform: translateY(-3px);
+    }
+
+    .thumb-wrap {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 18px;
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+    }
+
+    .thumb-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .play-overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(to top, rgba(0,0,0,.45), rgba(0,0,0,.15));
+    }
+
+    .play-badge {
+      background: rgba(0,0,0,.7);
+      border: 1px solid rgba(255,255,255,.15);
+      width: 64px;
+      height: 64px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+    }
+
+    .duration {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      font-size: 12px;
+      background: rgba(0,0,0,.82);
+      padding: 4px 6px;
+      border-radius: 8px;
+    }
+
+    .card-body {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 12px;
+      padding: 12px 4px 0;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #ff4d4d, #7a0000);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+    }
+
+    .video-title {
+      margin: 0 0 6px;
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    .meta, .desc {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .card-actions button {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .form-card, .login-card, .watch-layout, .empty-state {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .form-card, .login-card {
+      padding: 18px;
+      max-width: 760px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-grid .full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    input, textarea, select {
+      width: 100%;
+      background: #121212;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 13px;
+      border-radius: 12px;
+      outline: none;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .watch-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
+      padding: 18px;
+    }
+
+    .player {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: none;
+      border-radius: 18px;
+      background: #000;
+    }
+
+    .watch-title {
+      font-size: 28px;
+      margin: 14px 0 10px;
+    }
+
+    .watch-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .channel-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .channel-info strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .watch-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .watch-description {
+      margin-top: 14px;
+      padding: 14px;
+      background: #121212;
+      border-radius: 16px;
+      color: #ddd;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .side-list {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .mini-item {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .mini-item img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      border-radius: 14px;
+      background: #000;
+    }
+
+    .mini-item h4 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .mini-item .meta {
+      font-size: 12px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .empty-state {
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    @media (max-width: 1100px) {
+      .watch-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: fixed;
+        z-index: 30;
+        left: 0;
+        top: 0;
+        transform: translateX(-105%);
+        transition: transform .2s ease;
+        width: 260px;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .mobile-menu-btn {
+        display: inline-block;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .top-left, .top-right {
+        width: 100%;
+      }
+
+      .search-wrap {
+        max-width: none;
+      }
+
+      .mini-item {
+        grid-template-columns: 120px 1fr;
+      }
+
+      .hero h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
 </head>
-
 <body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-badge">▶</span>
+        <span>MiniTube</span>
+      </div>
 
-<header>
-🔥 MiniTube
-<input type="text" id="search" placeholder="Поиск...">
-</header>
+      <nav class="nav">
+        <button class="nav-btn active" data-page="home">🏠 Главная</button>
+        <button class="nav-btn" data-page="add">➕ Добавить видео</button>
+        <button class="nav-btn" data-page="login">🔐 Авторизация</button>
+      </nav>
 
-<div class="container" id="videos"></div>
+      <p class="footer-note">
+        Одностраничный MiniTube с локальным сохранением, поиском, отдельной страницей просмотра и интерфейсом в стиле видеохостинга.
+      </p>
+    </aside>
 
-<script>
-const videoData = [
-    { id: "Rkwo_U-ARl8", title: "Марин видео" },
-    { id: "tgbNymZ7vqY", title: "Пример видео 2" },
-    { id: "ysz5S6PUM-U", title: "Пример видео 3" }
-];
-
-const container = document.getElementById("videos");
-const search = document.getElementById("search");
-
-function renderVideos(list) {
-    container.innerHTML = "";
-    list.forEach(v => {
-        container.innerHTML += `
-        <div class="video">
-            <iframe src="https://www.youtube.com/embed/${v.id}"></iframe>
-            <div class="title">${v.title}</div>
+    <main class="content">
+      <header class="topbar">
+        <div class="top-left">
+          <button class="mobile-menu-btn" id="menuBtn">☰</button>
+          <div class="search-wrap">
+            <input id="searchInput" type="text" placeholder="Поиск видео по названию, автору или описанию..." />
+            <button class="chip-btn" id="clearSearchBtn">Очистить</button>
+          </div>
         </div>
-        `;
-    });
-}
 
-search.addEventListener("input", () => {
-    const filtered = videoData.filter(v =>
-        v.title.toLowerCase().includes(search.value.toLowerCase())
-    );
-    renderVideos(filtered);
-});
+        <div class="top-right">
+          <div class="user-pill" id="userPill">Гость</div>
+          <button class="primary-btn" id="quickAddBtn">Добавить</button>
+        </div>
+      </header>
 
-renderVideos(videoData);
-</script>
+      <section class="section" id="homePage">
+        <div class="hero">
+          <div>
+            <h1>MiniTube Pro</h1>
+            <p>
+              Здесь есть все 6 вариантов: авторизация, добавление видео через форму, сохранение в localStorage, адаптивный интерфейс, отдельная страница просмотра и дизайн в стиле YouTube.
+            </p>
+          </div>
+          <div class="stats">
+            <div class="stat"><span class="n" id="statVideos">0</span>Видео</div>
+            <div class="stat"><span class="n" id="statUser">0</span>Пользователь</div>
+            <div class="stat"><span class="n" id="statSaved">0</span>Сохранено</div>
+          </div>
+        </div>
 
+        <div class="filters" id="filters"></div>
+        <div class="video-grid" id="videoGrid"></div>
+        <div class="empty-state hidden" id="emptyState">
+          Ничего не найдено. Попробуй другой запрос или добавь новое видео.
+        </div>
+      </section>
+
+      <section class="section hidden" id="addPage">
+        <div class="form-card">
+          <h2>Добавить новое видео</h2>
+          <p class="hint">Поддерживается обычная ссылка YouTube, короткая ссылка youtu.be и прямая вставка ID видео.</p>
+          <form id="videoForm" class="form-grid">
+            <label>
+              Название видео
+              <input type="text" id="titleInput" required placeholder="Например: Мой лучший влог" />
+            </label>
+
+            <label>
+              Автор / канал
+              <input type="text" id="channelInput" required placeholder="Например: Marin Channel" />
+            </label>
+
+            <label class="full">
+              Ссылка YouTube или ID
+              <input type="text" id="urlInput" required placeholder="https://www.youtube.com/watch?v=..." />
+            </label>
+
+            <label>
+              Категория
+              <select id="categoryInput">
+                <option>Все</option>
+                <option>Музыка</option>
+                <option>Игры</option>
+                <option>Обучение</option>
+                <option>Развлечения</option>
+                <option>Влоги</option>
+                <option>Технологии</option>
+              </select>
+            </label>
+
+            <label>
+              Длительность
+              <input type="text" id="durationInput" placeholder="Например: 12:45" />
+            </label>
+
+            <label class="full">
+              Описание
+              <textarea id="descriptionInput" placeholder="Краткое описание ролика..."></textarea>
+            </label>
+
+            <div class="full" style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="primary-btn" type="submit">Сохранить видео</button>
+              <button class="ghost-btn" type="reset">Очистить форму</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="section hidden" id="loginPage">
+        <div class="login-card">
+          <h2>Авторизация</h2>
+          <p class="hint">Это демонстрационная локальная авторизация. Имя пользователя сохраняется в браузере.</p>
+          <form id="loginForm" class="form-grid">
+            <label>
+              Имя пользователя
+              <input type="text" id="usernameInput" required placeholder="Например: Marin" />
+            </label>
+
+            <label>
+              Пароль
+              <input type="password" id="passwordInput" required placeholder="Минимум 4 символа" />
+            </label>
+
+            <div class="full" style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="primary-btn" type="submit">Войти</button>
+              <button class="danger-btn" type="button" id="logoutBtn">Выйти</button>
+            </div>
+          </form>
+          <p class="footer-note" id="loginStatus">Сейчас вы не авторизованы.</p>
+        </div>
+      </section>
+
+      <section class="section hidden" id="watchPage">
+        <div class="watch-layout">
+          <div>
+            <iframe class="player" id="watchPlayer" allowfullscreen></iframe>
+            <h2 class="watch-title" id="watchTitle"></h2>
+            <div class="watch-meta">
+              <div class="channel-box">
+                <div class="avatar" id="watchAvatar">M</div>
+                <div class="channel-info">
+                  <strong id="watchChannel"></strong>
+                  <span class="meta" id="watchInfo"></span>
+                </div>
+              </div>
+              <div class="watch-actions">
+                <button class="ghost-btn" id="backHomeBtn">← Назад</button>
+                <button class="danger-btn" id="deleteVideoBtn">Удалить</button>
+              </div>
+            </div>
+            <div class="watch-description" id="watchDescription"></div>
+          </div>
+
+          <aside>
+            <h3 style="margin-top:0;">Следующие видео</h3>
+            <div class="side-list" id="recommendedList"></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const STORAGE_KEYS = {
+      videos: 'minitube_videos_v2',
+      user: 'minitube_user_v2'
+    };
+
+    const defaultVideos = [
+      {
+        id: crypto.randomUUID(),
+        youtubeId: 'Rkwo_U-ARl8',
+        title: 'Марин видео',
+        channel: 'Marin Channel',
+        description: 'Демо-видео для стартовой главной страницы MiniTube.',
+        category: 'Развлечения',
+        duration: '6:21',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        youtubeId: 'ysz5S6PUM-U',
+        title: 'Пример видео 2',
+        channel: 'Demo Creator',
+        description: 'Второй ролик для примера карточек и отдельной страницы просмотра.',
+        category: 'Музыка',
+        duration: '3:52',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        youtubeId: 'ScMzIvxBSi4',
+        title: 'Пример видео 3',
+        channel: 'Code Studio',
+        description: 'Третий ролик: можно искать, открывать и удалять.',
+        category: 'Обучение',
+        duration: '10:08',
+        createdAt: new Date().toISOString()
+      }
+    ];
+
+    let state = {
+      videos: [],
+      user: null,
+      search: '',
+      category: 'Все',
+      currentVideoId: null
+    };
+
+    const els = {
+      sidebar: document.getElementById('sidebar'),
+      menuBtn: document.getElementById('menuBtn'),
+      quickAddBtn: document.getElementById('quickAddBtn'),
+      searchInput: document.getElementById('searchInput'),
+      clearSearchBtn: document.getElementById('clearSearchBtn'),
+      navBtns: [...document.querySelectorAll('.nav-btn')],
+
+      homePage: document.getElementById('homePage'),
+      addPage: document.getElementById('addPage'),
+      loginPage: document.getElementById('loginPage'),
+      watchPage: document.getElementById('watchPage'),
+
+      videoGrid: document.getElementById('videoGrid'),
+      emptyState: document.getElementById('emptyState'),
+      filters: document.getElementById('filters'),
+      userPill: document.getElementById('userPill'),
+      statVideos: document.getElementById('statVideos'),
+      statUser: document.getElementById('statUser'),
+      statSaved: document.getElementById('statSaved'),
+
+      videoForm: document.getElementById('videoForm'),
+      titleInput: document.getElementById('titleInput'),
+      channelInput: document.getElementById('channelInput'),
+      urlInput: document.getElementById('urlInput'),
+      categoryInput: document.getElementById('categoryInput'),
+      durationInput: document.getElementById('durationInput'),
+      descriptionInput: document.getElementById('descriptionInput'),
+
+      loginForm: document.getElementById('loginForm'),
+      usernameInput: document.getElementById('usernameInput'),
+      passwordInput: document.getElementById('passwordInput'),
+      logoutBtn: document.getElementById('logoutBtn'),
+      loginStatus: document.getElementById('loginStatus'),
+
+      watchPlayer: document.getElementById('watchPlayer'),
+      watchTitle: document.getElementById('watchTitle'),
+      watchChannel: document.getElementById('watchChannel'),
+      watchInfo: document.getElementById('watchInfo'),
+      watchDescription: document.getElementById('watchDescription'),
+      watchAvatar: document.getElementById('watchAvatar'),
+      recommendedList: document.getElementById('recommendedList'),
+      deleteVideoBtn: document.getElementById('deleteVideoBtn'),
+      backHomeBtn: document.getElementById('backHomeBtn')
+    };
+
+    function loadState() {
+      const savedVideos = localStorage.getItem(STORAGE_KEYS.videos);
+      const savedUser = localStorage.getItem(STORAGE_KEYS.user);
+
+      state.videos = savedVideos ? JSON.parse(savedVideos) : defaultVideos;
+      state.user = savedUser ? JSON.parse(savedUser) : null;
+      persist();
+    }
+
+    function persist() {
+      localStorage.setItem(STORAGE_KEYS.videos, JSON.stringify(state.videos));
+      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(state.user));
+    }
+
+    function escapeHtml(str = '') {
+      return str
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function getYouTubeId(value) {
+      const raw = value.trim();
+      if (!raw) return null;
+
+      if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
+
+      const patterns = [
+        /[?&]v=([a-zA-Z0-9_-]{11})/,
+        /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+        /embed\/([a-zA-Z0-9_-]{11})/,
+        /shorts\/([a-zA-Z0-9_-]{11})/
+      ];
+
+      for (const pattern of patterns) {
+        const match = raw.match(pattern);
+        if (match) return match[1];
+      }
+
+      return null;
+    }
+
+    function thumbUrl(youtubeId) {
+      return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+
+    function initials(name = 'M') {
+      return name.trim().charAt(0).toUpperCase() || 'M';
+    }
+
+    function getCategories() {
+      const set = new Set(['Все']);
+      state.videos.forEach(v => set.add(v.category || 'Все'));
+      return [...set];
+    }
+
+    function filteredVideos() {
+      const term = state.search.trim().toLowerCase();
+      return state.videos.filter(v => {
+        const categoryOk = state.category === 'Все' || (v.category || 'Все') === state.category;
+        const text = `${v.title} ${v.channel} ${v.description}`.toLowerCase();
+        const searchOk = !term || text.includes(term);
+        return categoryOk && searchOk;
+      }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    function renderFilters() {
+      const cats = getCategories();
+      els.filters.innerHTML = cats.map(cat => `
+        <button class="filter-chip ${cat === state.category ? 'active' : ''}" data-cat="${escapeHtml(cat)}">${escapeHtml(cat)}</button>
+      `).join('');
+
+      [...els.filters.querySelectorAll('.filter-chip')].forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.category = btn.dataset.cat;
+          renderHome();
+        });
+      });
+    }
+
+    function renderHome() {
+      renderFilters();
+      const videos = filteredVideos();
+
+      els.videoGrid.innerHTML = videos.map(v => `
+        <article class="video-card">
+          <div class="thumb-wrap" data-open-id="${v.id}">
+            <img src="${thumbUrl(v.youtubeId)}" alt="${escapeHtml(v.title)}" />
+            <div class="play-overlay"><div class="play-badge">▶</div></div>
+            <div class="duration">${escapeHtml(v.duration || '—')}</div>
+          </div>
+          <div class="card-body">
+            <div class="avatar">${escapeHtml(initials(v.channel))}</div>
+            <div>
+              <h3 class="video-title">${escapeHtml(v.title)}</h3>
+              <div class="meta">${escapeHtml(v.channel)}</div>
+              <div class="meta">${escapeHtml(v.category || 'Все')} • ${formatDate(v.createdAt)}</div>
+              <div class="desc">${escapeHtml((v.description || '').slice(0, 90))}${v.description && v.description.length > 90 ? '…' : ''}</div>
+              <div class="card-actions">
+                <button data-open-id="${v.id}">Смотреть</button>
+                <button data-delete-id="${v.id}">Удалить</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      `).join('');
+
+      els.emptyState.classList.toggle('hidden', videos.length > 0);
+
+      [...document.querySelectorAll('[data-open-id]')].forEach(el => {
+        el.addEventListener('click', () => openWatchPage(el.dataset.openId));
+      });
+
+      [...document.querySelectorAll('[data-delete-id]')].forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteVideo(el.dataset.deleteId);
+        });
+      });
+
+      renderHeaderStats();
+    }
+
+    function renderHeaderStats() {
+      els.userPill.textContent = state.user ? `👤 ${state.user.username}` : 'Гость';
+      els.statVideos.textContent = String(state.videos.length);
+      els.statUser.textContent = state.user ? '1' : '0';
+      els.statSaved.textContent = localStorage.getItem(STORAGE_KEYS.videos) ? '1' : '0';
+      els.loginStatus.textContent = state.user
+        ? `Вы вошли как ${state.user.username}.`
+        : 'Сейчас вы не авторизованы.';
+    }
+
+    function showPage(page) {
+      const pageMap = {
+        home: els.homePage,
+        add: els.addPage,
+        login: els.loginPage,
+        watch: els.watchPage
+      };
+
+      Object.values(pageMap).forEach(p => p.classList.add('hidden'));
+      pageMap[page].classList.remove('hidden');
+
+      els.navBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.page === page);
+      });
+
+      if (window.innerWidth <= 900) {
+        els.sidebar.classList.remove('open');
+      }
+    }
+
+    function goTo(page) {
+      if (page === 'home') {
+        history.pushState({}, '', '#home');
+      } else if (page === 'add') {
+        history.pushState({}, '', '#add');
+      } else if (page === 'login') {
+        history.pushState({}, '', '#login');
+      }
+      route();
+    }
+
+    function route() {
+      const hash = location.hash || '#home';
+      if (hash.startsWith('#watch/')) {
+        const id = hash.replace('#watch/', '');
+        openWatchPage(id, true);
+        return;
+      }
+      if (hash === '#add') return showPage('add');
+      if (hash === '#login') return showPage('login');
+      showPage('home');
+      renderHome();
+    }
+
+    function openWatchPage(id, routed = false) {
+      const video = state.videos.find(v => v.id === id);
+      if (!video) {
+        goTo('home');
+        return;
+      }
+
+      state.currentVideoId = id;
+      els.watchPlayer.src = `https://www.youtube.com/embed/${video.youtubeId}?autoplay=1`;
+      els.watchTitle.textContent = video.title;
+      els.watchChannel.textContent = video.channel;
+      els.watchInfo.textContent = `${video.category || 'Все'} • ${video.duration || '—'} • ${formatDate(video.createdAt)}`;
+      els.watchDescription.textContent = video.description || 'Описание отсутствует.';
+      els.watchAvatar.textContent = initials(video.channel);
+
+      const recommended = state.videos.filter(v => v.id !== id).slice(0, 8);
+      els.recommendedList.innerHTML = recommended.map(v => `
+        <div class="mini-item" data-open-id="${v.id}">
+          <img src="${thumbUrl(v.youtubeId)}" alt="${escapeHtml(v.title)}" />
+          <div>
+            <h4>${escapeHtml(v.title)}</h4>
+            <div class="meta">${escapeHtml(v.channel)}</div>
+            <div class="meta">${escapeHtml(v.duration || '—')} • ${escapeHtml(v.category || 'Все')}</div>
+          </div>
+        </div>
+      `).join('');
+
+      [...els.recommendedList.querySelectorAll('[data-open-id]')].forEach(item => {
+        item.addEventListener('click', () => openWatchPage(item.dataset.openId));
+      });
+
+      showPage('watch');
+      if (!routed) {
+        history.pushState({}, '', `#watch/${id}`);
+      }
+    }
+
+    function deleteVideo(id) {
+      const video = state.videos.find(v => v.id === id);
+      if (!video) return;
+
+      const ok = confirm(`Удалить видео «${video.title}»?`);
+      if (!ok) return;
+
+      state.videos = state.videos.filter(v => v.id !== id);
+      persist();
+      renderHome();
+
+      if (state.currentVideoId === id) {
+        state.currentVideoId = null;
+        goTo('home');
+      }
+    }
+
+    function handleAddVideo(e) {
+      e.preventDefault();
+      const youtubeId = getYouTubeId(els.urlInput.value);
+
+      if (!youtubeId) {
+        alert('Не удалось распознать YouTube ID. Вставь корректную ссылку или ID видео.');
+        return;
+      }
+
+      const title = els.titleInput.value.trim();
+      const channel = els.channelInput.value.trim();
+      const description = els.descriptionInput.value.trim();
+      const category = els.categoryInput.value;
+      const duration = els.durationInput.value.trim() || 'Новое';
+
+      const newVideo = {
+        id: crypto.randomUUID(),
+        youtubeId,
+        title,
+        channel,
+        description,
+        category,
+        duration,
+        createdAt: new Date().toISOString()
+      };
+
+      state.videos.unshift(newVideo);
+      persist();
+      els.videoForm.reset();
+      state.category = 'Все';
+      state.search = '';
+      els.searchInput.value = '';
+      renderHome();
+      goTo('home');
+      alert('Видео добавлено и сохранено в браузере.');
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const username = els.usernameInput.value.trim();
+      const password = els.passwordInput.value;
+
+      if (username.length < 2) {
+        alert('Имя пользователя должно быть минимум из 2 символов.');
+        return;
+      }
+
+      if (password.length < 4) {
+        alert('Пароль должен быть минимум из 4 символов.');
+        return;
+      }
+
+      state.user = {
+        username,
+        loggedAt: new Date().toISOString()
+      };
+      persist();
+      renderHeaderStats();
+      alert(`Добро пожаловать, ${username}!`);
+      goTo('home');
+    }
+
+    function logout() {
+      state.user = null;
+      persist();
+      renderHeaderStats();
+      alert('Вы вышли из аккаунта.');
+    }
+
+    function bindEvents() {
+      els.menuBtn.addEventListener('click', () => {
+        els.sidebar.classList.toggle('open');
+      });
+
+      els.quickAddBtn.addEventListener('click', () => goTo('add'));
+      els.clearSearchBtn.addEventListener('click', () => {
+        state.search = '';
+        els.searchInput.value = '';
+        renderHome();
+      });
+
+      els.searchInput.addEventListener('input', (e) => {
+        state.search = e.target.value;
+        if (!location.hash.startsWith('#home')) {
+          history.pushState({}, '', '#home');
+          showPage('home');
+        }
+        renderHome();
+      });
+
+      els.navBtns.forEach(btn => {
+        btn.addEventListener('click', () => goTo(btn.dataset.page));
+      });
+
+      els.videoForm.addEventListener('submit', handleAddVideo);
+      els.loginForm.addEventListener('submit', handleLogin);
+      els.logoutBtn.addEventListener('click', logout);
+      els.backHomeBtn.addEventListener('click', () => goTo('home'));
+      els.deleteVideoBtn.addEventListener('click', () => {
+        if (state.currentVideoId) deleteVideo(state.currentVideoId);
+      });
+
+      window.addEventListener('hashchange', route);
+    }
+
+    loadState();
+    bindEvents();
+    renderHeaderStats();
+    route();
+  </script>
 </body>
 </html>
