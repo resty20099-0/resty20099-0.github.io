@@ -650,7 +650,7 @@
 
       <section class="section hidden" id="addPage">
         <div class="form-card">
-          <h2>Добавить новое видео</h2>
+          <h2 id="formTitle">Добавить новое видео</h2>
           <p class="hint">Поддерживается обычная ссылка YouTube, короткая ссылка youtu.be и прямая вставка ID видео. Аватар можно указать вручную ссылкой или подтягивать автоматически через YouTube Data API, если добавить API-ключ в код.</p>
           <form id="videoForm" class="form-grid">
             <label>
@@ -702,7 +702,7 @@
             </label>
 
             <div class="full" style="display:flex; gap:10px; flex-wrap:wrap;">
-              <button class="primary-btn" type="submit">Сохранить видео</button>
+              <button class="primary-btn" type="submit" id="saveVideoBtn">Сохранить видео</button>
               <button class="ghost-btn" type="reset">Очистить форму</button>
             </div>
           </form>
@@ -748,8 +748,18 @@
               </div>
               <div class="watch-actions">
                 <button class="ghost-btn" id="backHomeBtn">← Назад</button>
+                <button class="primary-btn" id="editVideoBtn">Редактировать</button>
                 <button class="danger-btn" id="deleteVideoBtn">Удалить</button>
               </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+              <label style="display:flex; align-items:center; gap:10px; color:var(--text);">
+                Громкость
+                <input type="range" id="volumeSlider" min="0" max="100" value="50" style="width:180px;" />
+              </label>
+              <span class="meta" id="volumeValue">50%</span>
+            </div>
+            
             </div>
             <div class="watch-description" id="watchDescription"></div>
           </div>
@@ -765,8 +775,9 @@
 
   <script>
     const STORAGE_KEYS = {
-      videos: 'minitube_videos_v3',
-      user: 'minitube_user_v3'
+      videos: 'minitube_videos_v4',
+      user: 'minitube_user_v4',
+      volume: 'minitube_volume_v1'
     };
 
     const YOUTUBE_API_KEY = ''; // Вставь сюда ключ YouTube Data API v3, если хочешь автозагрузку аватаров канала
@@ -812,7 +823,11 @@
       user: null,
       search: '',
       category: 'Все',
-      currentVideoId: null
+      currentVideoId: null,
+      editingVideoId: null,
+      volume: 50,
+      player: null,
+      playerReady: false
     };
 
     const els = {
@@ -845,6 +860,8 @@
       avatarInput: document.getElementById('avatarInput'),
       avatarFileInput: document.getElementById('avatarFileInput'),
       descriptionInput: document.getElementById('descriptionInput'),
+      formTitle: document.getElementById('formTitle'),
+      saveVideoBtn: document.getElementById('saveVideoBtn'),
 
       loginForm: document.getElementById('loginForm'),
       usernameInput: document.getElementById('usernameInput'),
@@ -860,21 +877,27 @@
       watchAvatar: document.getElementById('watchAvatar'),
       recommendedList: document.getElementById('recommendedList'),
       deleteVideoBtn: document.getElementById('deleteVideoBtn'),
-      backHomeBtn: document.getElementById('backHomeBtn')
+      editVideoBtn: document.getElementById('editVideoBtn'),
+      backHomeBtn: document.getElementById('backHomeBtn'),
+      volumeSlider: document.getElementById('volumeSlider'),
+      volumeValue: document.getElementById('volumeValue')
     };
 
     function loadState() {
       const savedVideos = localStorage.getItem(STORAGE_KEYS.videos);
       const savedUser = localStorage.getItem(STORAGE_KEYS.user);
+      const savedVolume = localStorage.getItem(STORAGE_KEYS.volume);
 
       state.videos = savedVideos ? JSON.parse(savedVideos) : defaultVideos;
       state.user = savedUser ? JSON.parse(savedUser) : null;
+      state.volume = savedVolume ? Number(savedVolume) : 50;
       persist();
     }
 
     function persist() {
       localStorage.setItem(STORAGE_KEYS.videos, JSON.stringify(state.videos));
       localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(state.user));
+      localStorage.setItem(STORAGE_KEYS.volume, String(state.volume));
     }
 
     function escapeHtml(str = '') {
@@ -909,6 +932,74 @@
 
     function thumbUrl(youtubeId) {
       return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+    }
+
+    function ensureYouTubeApi() {
+      if (window.YT && window.YT.Player) return Promise.resolve();
+      if (window.__minitubeYtPromise) return window.__minitubeYtPromise;
+
+      window.__minitubeYtPromise = new Promise(resolve => {
+        const existing = document.querySelector('script[data-youtube-api="true"]');
+        if (!existing) {
+          const script = document.createElement('script');
+          script.src = 'https://www.youtube.com/iframe_api';
+          script.dataset.youtubeApi = 'true';
+          document.head.appendChild(script);
+        }
+        const prev = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = function() {
+          if (typeof prev === 'function') prev();
+          resolve();
+        };
+      });
+
+      return window.__minitubeYtPromise;
+    }
+
+    function setPlayerVolume(volume) {
+      state.volume = Number(volume);
+      if (els.volumeSlider) els.volumeSlider.value = state.volume;
+      if (els.volumeValue) els.volumeValue.textContent = `${state.volume}%`;
+      if (state.player && state.playerReady && typeof state.player.setVolume === 'function') {
+        state.player.setVolume(state.volume);
+        if (state.volume > 0 && typeof state.player.unMute === 'function') state.player.unMute();
+        if (state.volume === 0 && typeof state.player.mute === 'function') state.player.mute();
+      }
+      persist();
+    }
+
+    async function mountPlayer(videoId) {
+      await ensureYouTubeApi();
+
+      const target = document.getElementById('watchPlayer');
+      if (!target) return;
+
+      const wrapper = document.createElement('div');
+      wrapper.id = 'watchPlayer';
+      wrapper.className = 'player';
+      target.replaceWith(wrapper);
+      els.watchPlayer = wrapper;
+      state.playerReady = false;
+
+      state.player = new YT.Player('watchPlayer', {
+        videoId,
+        playerVars: {
+          autoplay: 1,
+          rel: 0,
+          modestbranding: 1
+        },
+        events: {
+          onReady: (event) => {
+            state.playerReady = true;
+            event.target.setVolume(state.volume);
+            if (state.volume === 0) event.target.mute();
+            else event.target.unMute();
+            if (typeof event.target.playVideo === 'function') {
+              event.target.playVideo();
+            }
+          }
+        }
+      });
     }
 
     function avatarMarkup(video, size = 40) {
@@ -1036,6 +1127,42 @@
         : 'Сейчас вы не авторизованы.';
     }
 
+    function resetFormMode() {
+      state.editingVideoId = null;
+      els.formTitle.textContent = 'Добавить новое видео';
+      els.saveVideoBtn.textContent = 'Сохранить видео';
+      els.videoForm.reset();
+      if (els.avatarFileInput) els.avatarFileInput.value = '';
+    }
+
+    function fillFormForEdit(video) {
+      els.formTitle.textContent = 'Редактировать видео';
+      els.saveVideoBtn.textContent = 'Сохранить изменения';
+      els.titleInput.value = video.title || '';
+      els.channelInput.value = video.channel || '';
+      els.urlInput.value = video.youtubeId || '';
+      els.categoryInput.value = video.category || 'Все';
+      els.durationInput.value = video.duration || '';
+      els.descriptionInput.value = video.description || '';
+      els.avatarInput.value = video.avatar && !video.avatar.startsWith('data:') ? video.avatar : '';
+      if (els.avatarFileInput) els.avatarFileInput.value = '';
+    }
+
+    function startEditVideo(id) {
+      const video = state.videos.find(v => v.id === id);
+      if (!video) return;
+      state.editingVideoId = id;
+      fillFormForEdit(video);
+      goTo('add');
+    }` : 'Гость';
+      els.statVideos.textContent = String(state.videos.length);
+      els.statUser.textContent = state.user ? '1' : '0';
+      els.statSaved.textContent = localStorage.getItem(STORAGE_KEYS.videos) ? '1' : '0';
+      els.loginStatus.textContent = state.user
+        ? `Вы вошли как ${state.user.username}.`
+        : 'Сейчас вы не авторизованы.';
+    }
+
     function showPage(page) {
       const pageMap = {
         home: els.homePage,
@@ -1080,7 +1207,7 @@
       renderHome();
     }
 
-    function openWatchPage(id, routed = false) {
+    async function openWatchPage(id, routed = false) {
       const video = state.videos.find(v => v.id === id);
       if (!video) {
         goTo('home');
@@ -1088,7 +1215,7 @@
       }
 
       state.currentVideoId = id;
-      els.watchPlayer.src = `https://www.youtube.com/embed/${video.youtubeId}?autoplay=1`;
+      await mountPlayer(video.youtubeId);
       els.watchTitle.textContent = video.title;
       els.watchChannel.textContent = video.channel;
       els.watchInfo.textContent = `${video.category || 'Все'} • ${video.duration || '—'} • ${formatDate(video.createdAt)}`;
@@ -1115,6 +1242,7 @@
         item.addEventListener('click', () => openWatchPage(item.dataset.openId));
       });
 
+      setPlayerVolume(state.volume);
       showPage('watch');
       if (!routed) {
         history.pushState({}, '', `#watch/${id}`);
@@ -1168,12 +1296,20 @@
         avatar = els.avatarInput.value.trim();
       }
 
+      if (!avatar && state.editingVideoId) {
+        avatar = state.videos.find(v => v.id === state.editingVideoId)?.avatar || '';
+      }
+
       if (!avatar) {
         avatar = await fetchChannelAvatarByVideoId(youtubeId) || '';
       }
 
+      const existingCreatedAt = state.editingVideoId
+        ? (state.videos.find(v => v.id === state.editingVideoId)?.createdAt || new Date().toISOString())
+        : new Date().toISOString();
+
       const newVideo = {
-        id: crypto.randomUUID(),
+        id: state.editingVideoId || crypto.randomUUID(),
         youtubeId,
         title,
         channel,
@@ -1181,18 +1317,25 @@
         description,
         category,
         duration,
-        createdAt: new Date().toISOString()
+        createdAt: existingCreatedAt
       };
 
-      state.videos.unshift(newVideo);
+      const wasEditing = !!state.editingVideoId;
+
+      if (state.editingVideoId) {
+        state.videos = state.videos.map(v => v.id === state.editingVideoId ? newVideo : v);
+      } else {
+        state.videos.unshift(newVideo);
+      }
+
       persist();
-      els.videoForm.reset();
+      resetFormMode();
       state.category = 'Все';
       state.search = '';
       els.searchInput.value = '';
       renderHome();
       goTo('home');
-      alert('Видео добавлено и сохранено в браузере.');
+      alert(wasEditing ? 'Изменения сохранены.' : 'Видео добавлено и сохранено в браузере.');
     }
 
     function handleLogin(e) {
@@ -1232,7 +1375,10 @@
         els.sidebar.classList.toggle('open');
       });
 
-      els.quickAddBtn.addEventListener('click', () => goTo('add'));
+      els.quickAddBtn.addEventListener('click', () => {
+        resetFormMode();
+        goTo('add');
+      });
       els.clearSearchBtn.addEventListener('click', () => {
         state.search = '';
         els.searchInput.value = '';
@@ -1249,15 +1395,24 @@
       });
 
       els.navBtns.forEach(btn => {
-        btn.addEventListener('click', () => goTo(btn.dataset.page));
+        btn.addEventListener('click', () => {
+          if (btn.dataset.page === 'add') resetFormMode();
+          goTo(btn.dataset.page);
+        });
       });
 
       els.videoForm.addEventListener('submit', handleAddVideo);
       els.loginForm.addEventListener('submit', handleLogin);
       els.logoutBtn.addEventListener('click', logout);
       els.backHomeBtn.addEventListener('click', () => goTo('home'));
+      els.editVideoBtn.addEventListener('click', () => {
+        if (state.currentVideoId) startEditVideo(state.currentVideoId);
+      });
       els.deleteVideoBtn.addEventListener('click', () => {
         if (state.currentVideoId) deleteVideo(state.currentVideoId);
+      });
+      els.volumeSlider.addEventListener('input', (e) => {
+        setPlayerVolume(e.target.value);
       });
 
       window.addEventListener('hashchange', route);
@@ -1266,6 +1421,7 @@
     loadState();
     bindEvents();
     renderHeaderStats();
+    setPlayerVolume(state.volume);
     route();
   </script>
 </body>
