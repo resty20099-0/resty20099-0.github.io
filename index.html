@@ -14,15 +14,31 @@ body {
 }
 
 /* HEADER */
-header {
-  padding: 20px;
-  text-align: center;
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
   border-bottom: 1px solid #222;
 }
 
-header h1 {
+.left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid red;
+  object-fit: cover;
+}
+
+h1 {
   margin: 0;
-  font-size: 32px;
+  font-size: 30px;
   color: red;
   letter-spacing: 1px;
 }
@@ -93,8 +109,11 @@ iframe {
 
 <body>
 
-<header>
-  <h1>Rustex Remake</h1>
+<header class="header">
+  <div class="left">
+    <img src="avatar.png" class="avatar" />
+    <h1>Rustex Remake</h1>
+  </div>
 </header>
 
 <div class="search-box">
