@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>RustX Remake PRO</title>
+<title>RustX Remake</title>
 
 <style>
 :root{
   --bg:#0f0f0f;
   --panel:#181818;
-  --text:#f1f1f1;
+  --text:#fff;
   --accent:#ff0000;
   --border:#303030;
 }
@@ -21,22 +21,21 @@ body{
   color:var(--text);
 }
 
-/* HEADER */
 .header{
   display:flex;
   align-items:center;
-  padding:14px 18px;
+  padding:14px;
   border-bottom:1px solid var(--border);
 }
 
 .logo{
   display:flex;
-  align-items:center;
   gap:10px;
+  align-items:center;
   cursor:pointer;
   color:var(--accent);
-  font-size:22px;
   font-weight:bold;
+  font-size:22px;
 }
 
 .logo img{
@@ -46,11 +45,10 @@ body{
   border:2px solid var(--accent);
 }
 
-/* GRID */
 .grid{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:14px;
+  gap:12px;
   padding:20px;
 }
 
@@ -78,8 +76,7 @@ body{
   font-size:14px;
 }
 
-/* VIEW */
-.view{
+#view{
   display:none;
   padding:20px;
 }
@@ -89,29 +86,15 @@ body{
   height:500px;
 }
 
-/* BACK */
 .back{
   display:none;
   margin:10px 20px;
-  padding:10px 14px;
+  padding:10px;
   background:var(--accent);
   border:none;
   color:white;
   border-radius:8px;
   cursor:pointer;
-}
-
-/* MINI PLAYER */
-#miniPlayer{
-  position:fixed;
-  bottom:10px;
-  right:10px;
-  width:280px;
-  height:160px;
-  display:none;
-  z-index:9999;
-  border:2px solid var(--accent);
-  background:#000;
 }
 </style>
 </head>
@@ -129,19 +112,17 @@ body{
 
 <div id="grid" class="grid"></div>
 
-<div id="view" class="view">
+<div id="view">
   <div id="player"></div>
 </div>
-
-<div id="miniPlayer"></div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 
-/* ======================
-   📺 КАНАЛЫ
-====================== */
+/* =======================
+   📺 DATA
+======================= */
 const channels = [
   {
     id:"rust",
@@ -149,34 +130,41 @@ const channels = [
     avatar:"https://i.pravatar.cc/150?img=1",
     videos:[
       {
-        title:"Рейд база",
+        title:"Raid",
         url:"https://www.youtube.com/watch?v=ysz5S6PUM-U",
         thumb:"https://img.youtube.com/vi/ysz5S6PUM-U/hqdefault.jpg"
-      },
-      {
-        title:"PvP бой",
-        url:"https://www.youtube.com/watch?v=ScMzIvxBSi4",
-        thumb:"https://img.youtube.com/vi/ScMzIvxBSi4/hqdefault.jpg"
       }
     ]
   }
 ];
 
-let currentChannel=null;
-let ytPlayer=null;
-let lastTime=0;
-let currentVideoId=null;
+let currentChannel = null;
+let player = null;
+let apiReady = false;
+let pendingId = null;
 
-/* ======================
-   CHANNELS
-====================== */
+/* =======================
+   YT API READY
+======================= */
+function onYouTubeIframeAPIReady(){
+  apiReady = true;
+  if(pendingId){
+    createPlayer(pendingId);
+    pendingId = null;
+  }
+}
+
+/* =======================
+   HOME
+======================= */
 function renderChannels(){
-  currentChannel=null;
+  stopVideo();
 
+  currentChannel = null;
   document.getElementById("view").style.display="none";
   document.getElementById("backBtn").style.display="none";
 
-  const grid=document.getElementById("grid");
+  const grid = document.getElementById("grid");
   grid.style.display="grid";
   grid.innerHTML="";
 
@@ -192,11 +180,13 @@ function renderChannels(){
   });
 }
 
-/* ======================
-   OPEN CHANNEL
-====================== */
+/* =======================
+   CHANNEL
+======================= */
 function openChannel(id){
-  currentChannel=channels.find(c=>c.id===id);
+  stopVideo();
+
+  currentChannel = channels.find(c=>c.id===id);
 
   const grid=document.getElementById("grid");
   grid.innerHTML="";
@@ -213,52 +203,63 @@ function openChannel(id){
   });
 }
 
-/* ======================
-   YT READY
-====================== */
-function onYouTubeIframeAPIReady(){}
-
-/* ======================
-   OPEN VIDEO (PRO)
-====================== */
+/* =======================
+   VIDEO
+======================= */
 function openVideo(url){
-  const id=url.match(/v=([^&]+)/)[1];
-  currentVideoId=id;
+  const id = url.match(/v=([^&]+)/)[1];
 
   document.getElementById("grid").style.display="none";
   document.getElementById("view").style.display="block";
   document.getElementById("backBtn").style.display="block";
 
-  if(ytPlayer){
-    ytPlayer.loadVideoById(id);
+  if(!apiReady){
+    pendingId = id;
     return;
   }
 
-  ytPlayer=new YT.Player("player",{
+  createPlayer(id);
+}
+
+/* =======================
+   CREATE PLAYER (SAFE)
+======================= */
+function createPlayer(id){
+
+  // 🔥 убиваем старый плеер полностью
+  if(player){
+    player.destroy();
+    player = null;
+  }
+
+  document.getElementById("player").innerHTML = "";
+
+  player = new YT.Player("player",{
     videoId:id,
     playerVars:{
       autoplay:1,
       controls:1
-    },
-    events:{
-      onReady:(e)=>{
-        if(lastTime>0){
-          e.target.seekTo(lastTime);
-        }
-        e.target.playVideo();
-      }
     }
   });
 }
 
-/* ======================
-   BACK (NO BACKGROUND AUDIO FIX)
-====================== */
-function back(){
-  if(ytPlayer){
-    lastTime=ytPlayer.getCurrentTime();
-    ytPlayer.stopVideo(); // 🔥 убирает звук полностью
+/* =======================
+   STOP VIDEO (CRITICAL FIX)
+======================= */
+function stopVideo(){
+  if(player){
+    player.stopVideo();
+    player.destroy();
+    player = null;
   }
+  document.getElementById("player").innerHTML="";
+}
+
+/* =======================
+   BACK
+======================= */
+function back(){
+  stopVideo();
 
   document.getElementById("view").style.display="none";
   document.getElementById("grid").style.display="grid";
@@ -268,24 +269,12 @@ function back(){
   else renderChannels();
 }
 
-/* ======================
-   HOME
-====================== */
+/* =======================
+   HOME BUTTON
+======================= */
 function goHome(){
-  if(ytPlayer){
-    ytPlayer.stopVideo();
-  }
   renderChannels();
 }
-
-/* ======================
-   AUTO SAVE TIME
-====================== */
-setInterval(()=>{
-  if(ytPlayer){
-    lastTime=ytPlayer.getCurrentTime();
-  }
-},3000);
 
 /* START */
 renderChannels();
