@@ -21,9 +21,12 @@ body{
   color:var(--text);
 }
 
+/* HEADER */
 .header{
+  position:relative;
   display:flex;
   align-items:center;
+  justify-content:center;
   padding:14px;
   border-bottom:1px solid var(--border);
 }
@@ -36,6 +39,9 @@ body{
   color:var(--accent);
   font-weight:bold;
   font-size:22px;
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
 }
 
 .logo img{
@@ -45,6 +51,7 @@ body{
   border:2px solid var(--accent);
 }
 
+/* GRID */
 .grid{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
@@ -120,9 +127,6 @@ body{
 
 <script>
 
-/* =======================
-   📺 DATA
-======================= */
 const channels = [
   {
     id:"rust",
@@ -143,9 +147,6 @@ let player = null;
 let apiReady = false;
 let pendingId = null;
 
-/* =======================
-   YT API READY
-======================= */
 function onYouTubeIframeAPIReady(){
   apiReady = true;
   if(pendingId){
@@ -154,9 +155,6 @@ function onYouTubeIframeAPIReady(){
   }
 }
 
-/* =======================
-   HOME
-======================= */
 function renderChannels(){
   stopVideo();
 
@@ -180,9 +178,6 @@ function renderChannels(){
   });
 }
 
-/* =======================
-   CHANNEL
-======================= */
 function openChannel(id){
   stopVideo();
 
@@ -203,9 +198,6 @@ function openChannel(id){
   });
 }
 
-/* =======================
-   VIDEO
-======================= */
 function openVideo(url){
   const id = url.match(/v=([^&]+)/)[1];
 
@@ -221,12 +213,7 @@ function openVideo(url){
   createPlayer(id);
 }
 
-/* =======================
-   CREATE PLAYER (SAFE)
-======================= */
 function createPlayer(id){
-
-  // 🔥 убиваем старый плеер полностью
   if(player){
     player.destroy();
     player = null;
@@ -243,9 +230,6 @@ function createPlayer(id){
   });
 }
 
-/* =======================
-   STOP VIDEO (CRITICAL FIX)
-======================= */
 function stopVideo(){
   if(player){
     player.stopVideo();
@@ -255,9 +239,6 @@ function stopVideo(){
   document.getElementById("player").innerHTML="";
 }
 
-/* =======================
-   BACK
-======================= */
 function back(){
   stopVideo();
 
@@ -269,14 +250,10 @@ function back(){
   else renderChannels();
 }
 
-/* =======================
-   HOME BUTTON
-======================= */
 function goHome(){
   renderChannels();
 }
 
-/* START */
 renderChannels();
 
 </script>
