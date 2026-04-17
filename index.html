@@ -1,236 +1,529 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Rustex Remake</title>
+const SUPABASE_URL = "https://ufxumoigctmncujfztnh.supabase.co";
+const SUPABASE_ANON_KEY = "ВСТАВЬ_СВОЙ_PUBLISHABLE_KEY";
+const YOUTUBE_API_KEY = "ВСТАВЬ_СВОЙ_YOUTUBE_API_KEY";
 
-<style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #0f0f0f;
-  color: white;
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let state = {
+  videos: [],
+  user: null,
+  currentVideoId: null,
+  player: null,
+  playerReady: false,
+  volume: 50
+};
+
+const els = {
+  sidebar: document.getElementById("sidebar"),
+  menuBtn: document.getElementById("menuBtn"),
+  quickAddBtn: document.getElementById("quickAddBtn"),
+  searchInput: document.getElementById("searchInput"),
+  clearSearchBtn: document.getElementById("clearSearchBtn"),
+  navBtns: [...document.querySelectorAll(".nav-btn")],
+
+  homePage: document.getElementById("homePage"),
+  addPage: document.getElementById("addPage"),
+  authPage: document.getElementById("authPage"),
+  watchPage: document.getElementById("watchPage"),
+
+  videoGrid: document.getElementById("videoGrid"),
+  emptyState: document.getElementById("emptyState"),
+  userPill: document.getElementById("userPill"),
+  statVideos: document.getElementById("statVideos"),
+  statUser: document.getElementById("statUser"),
+
+  videoForm: document.getElementById("videoForm"),
+  urlInput: document.getElementById("urlInput"),
+
+  regEmail: document.getElementById("regEmail"),
+  regPassword: document.getElementById("regPassword"),
+  loginEmail: document.getElementById("loginEmail"),
+  loginPassword: document.getElementById("loginPassword"),
+  registerBtn: document.getElementById("registerBtn"),
+  loginBtn: document.getElementById("loginBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  authStatus: document.getElementById("authStatus"),
+
+  watchPlayer: document.getElementById("watchPlayer"),
+  watchTitle: document.getElementById("watchTitle"),
+  watchChannel: document.getElementById("watchChannel"),
+  watchInfo: document.getElementById("watchInfo"),
+  watchDescription: document.getElementById("watchDescription"),
+  watchAvatar: document.getElementById("watchAvatar"),
+  recommendedList: document.getElementById("recommendedList"),
+  backHomeBtn: document.getElementById("backHomeBtn"),
+  deleteVideoBtn: document.getElementById("deleteVideoBtn"),
+  volumeSlider: document.getElementById("volumeSlider"),
+  volumeValue: document.getElementById("volumeValue")
+};
+
+function escapeHtml(str = "") {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-/* HEADER */
-.header {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 18px;
-  border-bottom: 1px solid #222;
+function getYouTubeId(value) {
+  const raw = value.trim();
+  if (!raw) return null;
+  if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
+
+  const patterns = [
+    /[?&]v=([a-zA-Z0-9_-]{11})/,
+    /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+    /embed\/([a-zA-Z0-9_-]{11})/,
+    /shorts\/([a-zA-Z0-9_-]{11})/
+  ];
+
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
 }
 
-.left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: 2px solid red;
-  object-fit: cover;
-}
-
-h1 {
-  margin: 0;
-  font-size: 30px;
-  color: red;
-}
-
-/* SEARCH */
-.search-box {
-  display: flex;
-  justify-content: center;
-  padding: 15px;
-  gap: 10px;
-}
-
-input {
-  width: 300px;
-  padding: 10px;
-  border-radius: 8px;
-  border: none;
-  outline: none;
-}
-
-button {
-  padding: 10px 15px;
-  border: none;
-  border-radius: 8px;
-  background: red;
-  color: white;
-  cursor: pointer;
-}
-
-/* GRID */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 15px;
-  padding: 20px;
-}
-
-/* CARD */
-.card {
-  background: #1a1a1a;
-  border-radius: 10px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.card:hover {
-  transform: scale(1.03);
-}
-
-.card img {
-  width: 100%;
-}
-
-.card h3 {
-  font-size: 13px;
-  padding: 10px;
-  margin: 0;
-}
-
-/* VIEW */
-.view {
-  display: none;
-  padding: 20px;
-}
-
-iframe {
-  width: 100%;
-  height: 450px;
-  border-radius: 10px;
-  border: none;
-}
-
-.back {
-  display: none;
-  margin: 10px 20px;
-}
-</style>
-</head>
-
-<body>
-
-<header class="header">
-  <div class="left">
-    <img src="avatar.png" class="avatar" />
-    <h1>Rustex Remake</h1>
-  </div>
-</header>
-
-<div class="search-box">
-  <input id="search" placeholder="Поиск каналов..." />
-  <button onclick="loadChannels()">Поиск</button>
-</div>
-
-<button class="back" id="backBtn" onclick="back()">← Назад</button>
-
-<div id="videos" class="grid"></div>
-
-<div id="view" class="view">
-  <iframe id="player"></iframe>
-</div>
-
-<script>
-const API_KEY = "ТВОЙ_API_KEY";
-
-let mode = "channels";
-
-// 1. ЗАГРУЗКА КАНАЛОВ
-async function loadChannels() {
-  mode = "channels";
-
-  const query = document.getElementById("search").value || "rusted warfare";
-
-  const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=channel&maxResults=12&key=${API_KEY}`
-  );
-
-  const data = await res.json();
-
-  const container = document.getElementById("videos");
-  container.innerHTML = "";
-
-  data.items.forEach(item => {
-    const channelId = item.snippet.channelId;
-
-    const card = document.createElement("div");
-    card.className = "card";
-
-    card.innerHTML = `
-      <img src="${item.snippet.thumbnails.medium.url}" />
-      <h3>${item.snippet.channelTitle}</h3>
-    `;
-
-    card.onclick = () => loadVideos(channelId);
-
-    container.appendChild(card);
+function formatDate(dateStr) {
+  return new Date(dateStr).toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
   });
 }
 
-// 2. ВИДЕО КАНАЛА
-async function loadVideos(channelId) {
-  mode = "videos";
+function avatarMarkup(video, size = 40) {
+  const avatar = video.channel_avatar || "";
+  const channel = video.channel_title || "Канал";
 
-  const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=12&type=video&key=${API_KEY}`
-  );
+  if (avatar) {
+    return `<div class="avatar" style="width:${size}px;height:${size}px;"><img src="${escapeHtml(avatar)}" alt="${escapeHtml(channel)}"></div>`;
+  }
 
-  const data = await res.json();
+  return `<div class="avatar" style="width:${size}px;height:${size}px;">${escapeHtml(channel.charAt(0).toUpperCase())}</div>`;
+}
 
-  const container = document.getElementById("videos");
-  container.innerHTML = "";
+function showPage(page) {
+  const pages = {
+    home: els.homePage,
+    add: els.addPage,
+    auth: els.authPage,
+    watch: els.watchPage
+  };
 
-  data.items.forEach(video => {
-    const videoId = video.id.videoId;
+  Object.values(pages).forEach(p => p.classList.add("hidden"));
+  pages[page].classList.remove("hidden");
 
-    const card = document.createElement("div");
-    card.className = "card";
+  els.navBtns.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.page === page);
+  });
 
-    card.innerHTML = `
-      <img src="${video.snippet.thumbnails.medium.url}" />
-      <h3>${video.snippet.title}</h3>
-    `;
+  if (window.innerWidth <= 900) {
+    els.sidebar.classList.remove("open");
+  }
+}
 
-    card.onclick = () => openVideo(videoId);
+function goTo(page) {
+  const hashMap = {
+    home: "#home",
+    add: "#add",
+    auth: "#auth"
+  };
+  history.pushState({}, "", hashMap[page] || "#home");
+  route();
+}
 
-    container.appendChild(card);
+function route() {
+  const hash = location.hash || "#home";
+
+  if (hash.startsWith("#watch/")) {
+    const id = hash.replace("#watch/", "");
+    openWatchPage(id, true);
+    return;
+  }
+
+  if (hash === "#add") {
+    showPage("add");
+    return;
+  }
+
+  if (hash === "#auth") {
+    showPage("auth");
+    return;
+  }
+
+  showPage("home");
+  renderHome();
+}
+
+function setPlayerVolume(volume) {
+  state.volume = Number(volume);
+  els.volumeSlider.value = state.volume;
+  els.volumeValue.textContent = `${state.volume}%`;
+
+  if (state.player && state.playerReady && typeof state.player.setVolume === "function") {
+    state.player.setVolume(state.volume);
+    if (state.volume === 0 && typeof state.player.mute === "function") state.player.mute();
+    if (state.volume > 0 && typeof state.player.unMute === "function") state.player.unMute();
+  }
+}
+
+function mountPlayer(videoId) {
+  const oldNode = document.getElementById("watchPlayer");
+  const newNode = document.createElement("div");
+  newNode.id = "watchPlayer";
+  newNode.className = "player";
+  oldNode.replaceWith(newNode);
+  els.watchPlayer = newNode;
+  state.playerReady = false;
+
+  state.player = new YT.Player("watchPlayer", {
+    videoId,
+    playerVars: {
+      autoplay: 1,
+      rel: 0,
+      modestbranding: 1
+    },
+    events: {
+      onReady: (event) => {
+        state.playerReady = true;
+        event.target.setVolume(state.volume);
+        if (state.volume === 0) event.target.mute();
+        else event.target.unMute();
+        event.target.playVideo();
+      }
+    }
   });
 }
 
-// 3. ОТКРЫТЬ ВИДЕО
-function openVideo(videoId) {
-  document.getElementById("videos").style.display = "none";
-  document.getElementById("view").style.display = "block";
-  document.getElementById("backBtn").style.display = "block";
+async function fetchCurrentUser() {
+  const { data, error } = await supabase.auth.getUser();
 
-  document.getElementById("player").src =
-    `https://www.youtube.com/embed/${videoId}`;
+  if (error || !data?.user) {
+    state.user = null;
+  } else {
+    state.user = data.user;
+  }
+
+  renderAuthStatus();
 }
 
-// 4. НАЗАД
-function back() {
-  document.getElementById("videos").style.display = "grid";
-  document.getElementById("view").style.display = "none";
-  document.getElementById("backBtn").style.display = "none";
-
-  document.getElementById("player").src = "";
-
-  loadChannels();
+function renderAuthStatus() {
+  els.userPill.textContent = state.user ? `👤 ${state.user.email}` : "Гость";
+  els.authStatus.textContent = state.user ? `Вошёл как: ${state.user.email}` : "Не авторизован";
+  els.statUser.textContent = state.user ? "1" : "0";
 }
 
-// старт
-loadChannels();
-</script>
+async function register() {
+  const email = els.regEmail.value.trim();
+  const password = els.regPassword.value;
 
-</body>
-</html>
+  if (!email || !password) {
+    alert("Введи email и пароль");
+    return;
+  }
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert("Регистрация выполнена");
+  await fetchCurrentUser();
+}
+
+async function login() {
+  const email = els.loginEmail.value.trim();
+  const password = els.loginPassword.value;
+
+  if (!email || !password) {
+    alert("Введи email и пароль");
+    return;
+  }
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert("Вход выполнен");
+  await fetchCurrentUser();
+}
+
+async function logout() {
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  state.user = null;
+  renderAuthStatus();
+  alert("Вы вышли");
+  goTo("home");
+}
+
+async function loadVideosFromDB() {
+  const { data, error } = await supabase
+    .from("videos")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  state.videos = data || [];
+  els.statVideos.textContent = String(state.videos.length);
+  renderHome();
+}
+
+function renderHome() {
+  const term = els.searchInput.value.trim().toLowerCase();
+
+  const videos = state.videos.filter(v => {
+    const text = `${v.title || ""} ${v.channel_title || ""} ${v.description || ""}`.toLowerCase();
+    return !term || text.includes(term);
+  });
+
+  els.videoGrid.innerHTML = videos.map(v => `
+    <article class="video-card">
+      <div class="thumb-wrap" data-open-id="${v.id}">
+        <img src="${escapeHtml(v.thumbnail_url || "")}" alt="${escapeHtml(v.title || "Видео")}" />
+        <div class="play-overlay"><div class="play-badge">▶</div></div>
+      </div>
+      <div class="card-body">
+        ${avatarMarkup(v)}
+        <div>
+          <h3 class="video-title">${escapeHtml(v.title || "Без названия")}</h3>
+          <div class="meta">${escapeHtml(v.channel_title || "Без канала")}</div>
+          <div class="meta">${formatDate(v.created_at)}</div>
+          <div class="desc">${escapeHtml((v.description || "").slice(0, 90))}${v.description && v.description.length > 90 ? "…" : ""}</div>
+          <div class="card-actions">
+            <button data-open-id="${v.id}" type="button">Смотреть</button>
+          </div>
+        </div>
+      </div>
+    </article>
+  `).join("");
+
+  els.emptyState.classList.toggle("hidden", videos.length > 0);
+
+  [...document.querySelectorAll("[data-open-id]")].forEach(el => {
+    el.addEventListener("click", () => openWatchPage(el.dataset.openId));
+  });
+}
+
+async function openWatchPage(id, routed = false) {
+  const video = state.videos.find(v => String(v.id) === String(id));
+  if (!video) {
+    goTo("home");
+    return;
+  }
+
+  state.currentVideoId = id;
+  showPage("watch");
+  mountPlayer(video.youtube_id);
+
+  els.watchTitle.textContent = video.title || "Без названия";
+  els.watchChannel.textContent = video.channel_title || "Без канала";
+  els.watchInfo.textContent = formatDate(video.created_at);
+  els.watchDescription.textContent = video.description || "Описание отсутствует.";
+
+  if (video.channel_avatar) {
+    els.watchAvatar.innerHTML = `<img src="${escapeHtml(video.channel_avatar)}" alt="${escapeHtml(video.channel_title || "")}">`;
+  } else {
+    els.watchAvatar.textContent = (video.channel_title || "M").charAt(0).toUpperCase();
+  }
+
+  const recommended = state.videos.filter(v => String(v.id) !== String(id)).slice(0, 8);
+  els.recommendedList.innerHTML = recommended.map(v => `
+    <div class="mini-item" data-open-id="${v.id}">
+      <img src="${escapeHtml(v.thumbnail_url || "")}" alt="${escapeHtml(v.title || "")}" />
+      <div>
+        <h4>${escapeHtml(v.title || "Без названия")}</h4>
+        <div class="meta">${escapeHtml(v.channel_title || "Без канала")}</div>
+      </div>
+    </div>
+  `).join("");
+
+  [...els.recommendedList.querySelectorAll("[data-open-id]")].forEach(item => {
+    item.addEventListener("click", () => openWatchPage(item.dataset.openId));
+  });
+
+  setPlayerVolume(state.volume);
+
+  if (!routed) {
+    history.pushState({}, "", `#watch/${id}`);
+  }
+}
+
+async function deleteCurrentVideo() {
+  if (!state.currentVideoId) return;
+  if (!state.user) {
+    alert("Сначала войди в аккаунт");
+    return;
+  }
+
+  const target = state.videos.find(v => String(v.id) === String(state.currentVideoId));
+  if (!target) return;
+
+  if (target.user_id !== state.user.id) {
+    alert("Ты можешь удалить только своё видео");
+    return;
+  }
+
+  if (!confirm(`Удалить видео «${target.title}»?`)) return;
+
+  const { error } = await supabase
+    .from("videos")
+    .delete()
+    .eq("id", target.id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await loadVideosFromDB();
+  goTo("home");
+}
+
+async function fetchYoutubeData(youtubeId) {
+  const videoRes = await fetch(
+    `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${youtubeId}&key=${YOUTUBE_API_KEY}`
+  );
+  const videoData = await videoRes.json();
+  const snippet = videoData.items?.[0]?.snippet;
+
+  if (!snippet) return null;
+
+  const channelId = snippet.channelId || "";
+  let channelAvatar = "";
+
+  if (channelId) {
+    const channelRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${YOUTUBE_API_KEY}`
+    );
+    const channelData = await channelRes.json();
+    const channelSnippet = channelData.items?.[0]?.snippet;
+
+    channelAvatar =
+      channelSnippet?.thumbnails?.high?.url ||
+      channelSnippet?.thumbnails?.medium?.url ||
+      channelSnippet?.thumbnails?.default?.url ||
+      "";
+  }
+
+  return {
+    title: snippet.title || "",
+    description: snippet.description || "",
+    channel_title: snippet.channelTitle || "",
+    channel_avatar: channelAvatar,
+    thumbnail_url:
+      snippet.thumbnails?.high?.url ||
+      snippet.thumbnails?.medium?.url ||
+      snippet.thumbnails?.default?.url ||
+      ""
+  };
+}
+
+async function handleAddVideo(e) {
+  e.preventDefault();
+
+  if (!state.user) {
+    alert("Сначала войди в аккаунт");
+    return;
+  }
+
+  const link = els.urlInput.value.trim();
+  const youtubeId = getYouTubeId(link);
+
+  if (!youtubeId) {
+    alert("Неверная YouTube ссылка");
+    return;
+  }
+
+  const yt = await fetchYoutubeData(youtubeId);
+
+  if (!yt) {
+    alert("Не удалось получить данные видео");
+    return;
+  }
+
+  const { error } = await supabase.from("videos").insert([
+    {
+      user_id: state.user.id,
+      youtube_url: link,
+      youtube_id: youtubeId,
+      title: yt.title,
+      description: yt.description,
+      channel_title: yt.channel_title,
+      channel_avatar: yt.channel_avatar,
+      thumbnail_url: yt.thumbnail_url
+    }
+  ]);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  els.urlInput.value = "";
+  alert("Видео добавлено");
+  await loadVideosFromDB();
+  goTo("home");
+}
+
+function bindEvents() {
+  els.menuBtn.addEventListener("click", () => {
+    els.sidebar.classList.toggle("open");
+  });
+
+  els.quickAddBtn.addEventListener("click", () => goTo("add"));
+  els.clearSearchBtn.addEventListener("click", () => {
+    els.searchInput.value = "";
+    renderHome();
+  });
+
+  els.searchInput.addEventListener("input", renderHome);
+
+  els.navBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      goTo(btn.dataset.page);
+    });
+  });
+
+  els.videoForm.addEventListener("submit", handleAddVideo);
+  els.registerBtn.addEventListener("click", register);
+  els.loginBtn.addEventListener("click", login);
+  els.logoutBtn.addEventListener("click", logout);
+  els.backHomeBtn.addEventListener("click", () => goTo("home"));
+  els.deleteVideoBtn.addEventListener("click", deleteCurrentVideo);
+  els.volumeSlider.addEventListener("input", e => setPlayerVolume(e.target.value));
+
+  window.addEventListener("hashchange", route);
+}
+
+async function init() {
+  bindEvents();
+  await fetchCurrentUser();
+  await loadVideosFromDB();
+  setPlayerVolume(state.volume);
+  route();
+}
+
+init();
