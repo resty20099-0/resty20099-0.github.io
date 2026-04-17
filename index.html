@@ -6,86 +6,93 @@
 <title>RustX Remake</title>
 
 <style>
+:root{
+  --bg:#0f0f0f;
+  --panel:#181818;
+  --panel2:#202020;
+  --text:#f1f1f1;
+  --muted:#aaaaaa;
+  --accent:#ff0000;
+  --border:#2a2a2a;
+  --shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+
+*{box-sizing:border-box}
+
 body{
   margin:0;
-  font-family:Arial;
-  background:#0f0f0f;
-  color:white;
+  font-family:Arial, Helvetica, sans-serif;
+  background:var(--bg);
+  color:var(--text);
 }
 
 /* HEADER */
 .header{
+  position:sticky;
+  top:0;
+  z-index:10;
   display:flex;
   justify-content:center;
   align-items:center;
-  padding:14px;
-  border-bottom:1px solid #333;
-  position:relative;
+  padding:14px 18px;
+  background:rgba(15,15,15,.85);
+  backdrop-filter: blur(10px);
+  border-bottom:1px solid var(--border);
 }
 
 .logo{
   display:flex;
   align-items:center;
   gap:10px;
-  color:red;
-  font-weight:bold;
   font-size:22px;
+  font-weight:800;
+  color:var(--accent);
   cursor:pointer;
+  letter-spacing:0.5px;
 }
 
 .logo img{
   width:40px;
   height:40px;
   border-radius:50%;
-  border:2px solid red;
+  border:2px solid var(--accent);
+  box-shadow:0 0 15px rgba(255,0,0,.3);
 }
 
-/* CHANNELS */
+/* GRID (CHANNELS) */
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-  gap:14px;
-  padding:20px;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:18px;
+  padding:24px;
 }
 
 .card{
-  background:#181818;
-  border-radius:12px;
+  background:linear-gradient(145deg, var(--panel), #121212);
+  border:1px solid var(--border);
+  border-radius:16px;
   overflow:hidden;
   cursor:pointer;
-  transition:0.2s;
+  transition:0.25s ease;
+  box-shadow: var(--shadow);
 }
 
-.card:hover{ transform:scale(1.03); }
+.card:hover{
+  transform:translateY(-5px);
+  border-color:rgba(255,0,0,.4);
+}
 
 .card img{
   width:100%;
-  height:130px;
+  height:140px;
   object-fit:cover;
+  filter:contrast(1.1);
 }
 
 .card h3{
-  margin:10px;
-  font-size:14px;
-}
-
-/* VIDEO LIST */
-.video{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  padding:10px;
-  background:#181818;
-  margin:10px 20px;
-  border-radius:10px;
-  cursor:pointer;
-}
-
-.video img{
-  width:60px;
-  height:60px;
-  border-radius:10px;
-  object-fit:cover;
+  margin:0;
+  padding:12px 12px 14px;
+  font-size:15px;
 }
 
 /* VIEW */
@@ -94,21 +101,88 @@ body{
   padding:20px;
 }
 
+/* PLAYER */
 #player{
   width:100%;
-  height:500px;
+  height:520px;
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow:var(--shadow);
 }
 
-/* BACK */
+/* BACK BUTTON */
 .back{
   display:none;
-  margin:10px 20px;
-  padding:10px;
-  background:red;
+  margin:14px 20px;
+  padding:10px 14px;
+  background:linear-gradient(135deg, var(--accent), #b30000);
   border:none;
   color:white;
-  border-radius:8px;
+  border-radius:10px;
   cursor:pointer;
+  font-weight:bold;
+  transition:.2s;
+}
+
+.back:hover{
+  transform:scale(1.03);
+}
+
+/* VIDEO LIST */
+#videos{
+  margin-top:18px;
+  display:grid;
+  gap:12px;
+}
+
+.video{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.video:hover{
+  background:var(--panel2);
+  transform:translateX(4px);
+  border-color:rgba(255,0,0,.25);
+}
+
+.video img{
+  width:64px;
+  height:64px;
+  border-radius:12px;
+  object-fit:cover;
+}
+
+.video div{
+  font-size:14px;
+  color:var(--text);
+}
+
+/* small text vibe */
+.muted{
+  color:var(--muted);
+  font-size:12px;
+  margin-top:4px;
+}
+
+/* smooth background glow */
+body::before{
+  content:"";
+  position:fixed;
+  top:-200px;
+  left:-200px;
+  width:500px;
+  height:500px;
+  background:radial-gradient(circle, rgba(255,0,0,.12), transparent 60%);
+  filter:blur(60px);
+  z-index:-1;
 }
 </style>
 </head>
@@ -135,28 +209,23 @@ body{
 
 <script>
 
-/* =======================
-   📦 КАНАЛЫ (ТЫ РЕДАКТИРУЕШЬ ТУТ)
-======================= */
-
 const channels = [
   {
     name:"Marmok",
-    avatar:"marmok.png",   // 🔥 файл с GitHub
+    avatar:"marmok.png",
     videos:[
       {
         title:"Смешной ролик 1",
         url:"https://www.youtube.com/watch?v=ysz5S6PUM-U",
-        thumb:"thumb1.jpg"
+        thumb:"https://img.youtube.com/vi/ysz5S6PUM-U/hqdefault.jpg"
       },
       {
         title:"Смешной ролик 2",
         url:"https://www.youtube.com/watch?v=ScMzIvxBSi4",
-        thumb:"thumb2.jpg"
+        thumb:"https://img.youtube.com/vi/ScMzIvxBSi4/hqdefault.jpg"
       }
     ]
   },
-
   {
     name:"Rust Channel",
     avatar:"rust.png",
@@ -164,26 +233,14 @@ const channels = [
       {
         title:"Raid Base",
         url:"https://www.youtube.com/watch?v=ysz5S6PUM-U",
-        thumb:"thumb3.jpg"
+        thumb:"https://img.youtube.com/vi/ysz5S6PUM-U/hqdefault.jpg"
       }
     ]
   }
 ];
 
-let currentChannel=null;
 let player=null;
-let apiReady=false;
 
-/* =======================
-   YOUTUBE API
-======================= */
-function onYouTubeIframeAPIReady(){
-  apiReady=true;
-}
-
-/* =======================
-   HOME (КАНАЛЫ)
-======================= */
 function renderHome(){
   stopVideo();
 
@@ -204,11 +261,8 @@ function renderHome(){
   });
 }
 
-/* =======================
-   CHANNEL → VIDEO LIST
-======================= */
-function openChannel(index){
-  currentChannel = channels[index];
+function openChannel(i){
+  const ch = channels[i];
 
   document.getElementById("grid").style.display="none";
   document.getElementById("view").style.display="block";
@@ -217,19 +271,19 @@ function openChannel(index){
   const box=document.getElementById("videos");
   box.innerHTML="";
 
-  currentChannel.videos.forEach(v=>{
+  ch.videos.forEach(v=>{
     box.innerHTML += `
       <div class="video" onclick="play('${v.url}')">
         <img src="${v.thumb}">
-        <div>${v.title}</div>
+        <div>
+          ${v.title}
+          <div class="muted">RustX Video</div>
+        </div>
       </div>
     `;
   });
 }
 
-/* =======================
-   PLAY VIDEO
-======================= */
 function play(url){
   const id=url.match(/v=([^&]+)/)[1];
 
@@ -246,17 +300,11 @@ function play(url){
   });
 }
 
-/* =======================
-   BACK
-======================= */
 function back(){
   stopVideo();
   renderHome();
 }
 
-/* =======================
-   STOP
-======================= */
 function stopVideo(){
   if(player){
     player.destroy();
@@ -265,14 +313,10 @@ function stopVideo(){
   document.getElementById("player").innerHTML="";
 }
 
-/* =======================
-   HOME BUTTON
-======================= */
 function home(){
   renderHome();
 }
 
-/* START */
 renderHome();
 
 </script>
