@@ -16,8 +16,8 @@ body {
 /* HEADER */
 .header {
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   padding: 18px;
   border-bottom: 1px solid #222;
 }
@@ -55,6 +55,7 @@ input {
   padding: 10px;
   border-radius: 8px;
   border: none;
+  outline: none;
 }
 
 button {
@@ -94,38 +95,25 @@ button {
 .card h3 {
   font-size: 13px;
   padding: 10px;
+  margin: 0;
 }
 
-/* PLAYER MODE */
-.player {
+/* VIEW */
+.view {
   display: none;
   padding: 20px;
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 15px;
 }
 
-.video-box iframe {
+iframe {
   width: 100%;
-  height: 420px;
+  height: 450px;
   border-radius: 10px;
-}
-
-.sidebar {
-  background: #1a1a1a;
-  padding: 10px;
-  border-radius: 10px;
-}
-
-.rec {
-  cursor: pointer;
-  margin-bottom: 10px;
-  font-size: 13px;
+  border: none;
 }
 
 .back {
-  margin: 10px 20px;
   display: none;
+  margin: 10px 20px;
 }
 </style>
 </head>
@@ -139,31 +127,62 @@ button {
   </div>
 </header>
 
-<div class="search-box" id="searchBox">
-  <input id="search" placeholder="Поиск видео..." />
-  <button onclick="loadVideos()">Поиск</button>
+<div class="search-box">
+  <input id="search" placeholder="Поиск каналов..." />
+  <button onclick="loadChannels()">Поиск</button>
 </div>
 
 <button class="back" id="backBtn" onclick="back()">← Назад</button>
 
 <div id="videos" class="grid"></div>
 
-<!-- PLAYER -->
-<div id="player" class="player">
-  <div class="video-box">
-    <iframe id="mainVideo" allowfullscreen></iframe>
-  </div>
-  <div class="sidebar" id="sidebar"></div>
+<div id="view" class="view">
+  <iframe id="player"></iframe>
 </div>
 
 <script>
 const API_KEY = "ТВОЙ_API_KEY";
 
-async function loadVideos() {
+let mode = "channels";
+
+// 1. ЗАГРУЗКА КАНАЛОВ
+async function loadChannels() {
+  mode = "channels";
+
   const query = document.getElementById("search").value || "rusted warfare";
 
   const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&maxResults=12&type=video&key=${API_KEY}`
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=channel&maxResults=12&key=${API_KEY}`
+  );
+
+  const data = await res.json();
+
+  const container = document.getElementById("videos");
+  container.innerHTML = "";
+
+  data.items.forEach(item => {
+    const channelId = item.snippet.channelId;
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <img src="${item.snippet.thumbnails.medium.url}" />
+      <h3>${item.snippet.channelTitle}</h3>
+    `;
+
+    card.onclick = () => loadVideos(channelId);
+
+    container.appendChild(card);
+  });
+}
+
+// 2. ВИДЕО КАНАЛА
+async function loadVideos(channelId) {
+  mode = "videos";
+
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=12&type=video&key=${API_KEY}`
   );
 
   const data = await res.json();
@@ -182,48 +201,35 @@ async function loadVideos() {
       <h3>${video.snippet.title}</h3>
     `;
 
-    card.onclick = () => openVideo(videoId, query);
+    card.onclick = () => openVideo(videoId);
 
     container.appendChild(card);
   });
 }
 
-async function openVideo(videoId, query) {
+// 3. ОТКРЫТЬ ВИДЕО
+function openVideo(videoId) {
   document.getElementById("videos").style.display = "none";
-  document.getElementById("player").style.display = "grid";
+  document.getElementById("view").style.display = "block";
   document.getElementById("backBtn").style.display = "block";
 
-  document.getElementById("mainVideo").src =
+  document.getElementById("player").src =
     `https://www.youtube.com/embed/${videoId}`;
-
-  const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&maxResults=8&type=video&key=${API_KEY}`
-  );
-
-  const data = await res.json();
-
-  const sidebar = document.getElementById("sidebar");
-  sidebar.innerHTML = "<h3>Рекомендации</h3>";
-
-  data.items.forEach(v => {
-    const div = document.createElement("div");
-    div.className = "rec";
-    div.innerText = v.snippet.title;
-
-    div.onclick = () => openVideo(v.id.videoId, query);
-
-    sidebar.appendChild(div);
-  });
 }
 
+// 4. НАЗАД
 function back() {
   document.getElementById("videos").style.display = "grid";
-  document.getElementById("player").style.display = "none";
+  document.getElementById("view").style.display = "none";
   document.getElementById("backBtn").style.display = "none";
-  document.getElementById("mainVideo").src = "";
+
+  document.getElementById("player").src = "";
+
+  loadChannels();
 }
 
-loadVideos();
+// старт
+loadChannels();
 </script>
 
 </body>
