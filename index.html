@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>RustX Remake</title>
 
@@ -10,200 +10,184 @@
   --bg:#0f0f0f;
   --panel:#181818;
   --panel2:#202020;
-  --text:#f1f1f1;
-  --muted:#aaaaaa;
+  --text:#fff;
+  --muted:#aaa;
   --accent:#ff0000;
   --border:#2a2a2a;
-  --shadow: 0 10px 30px rgba(0,0,0,.45);
 }
 
 *{box-sizing:border-box}
 
 body{
   margin:0;
-  font-family:Arial, Helvetica, sans-serif;
+  font-family:Arial;
   background:var(--bg);
   color:var(--text);
+  overflow-x:hidden;
 }
 
-/* HEADER */
-.header{
-  position:sticky;
+/* TOPBAR */
+.topbar{
+  position:fixed;
   top:0;
-  z-index:10;
+  left:0;
+  right:0;
+  height:56px;
   display:flex;
-  justify-content:center;
   align-items:center;
-  padding:14px 18px;
-  background:rgba(15,15,15,.85);
-  backdrop-filter: blur(10px);
+  justify-content:space-between;
+  padding:0 16px;
+  background:#0f0f0f;
   border-bottom:1px solid var(--border);
+  z-index:100;
 }
 
 .logo{
   display:flex;
   align-items:center;
   gap:10px;
-  font-size:22px;
-  font-weight:800;
+  font-weight:bold;
   color:var(--accent);
   cursor:pointer;
-  letter-spacing:0.5px;
 }
 
 .logo img{
-  width:40px;
-  height:40px;
+  width:34px;
+  height:34px;
   border-radius:50%;
   border:2px solid var(--accent);
-  box-shadow:0 0 15px rgba(255,0,0,.3);
 }
 
-/* GRID (CHANNELS) */
+/* LAYOUT */
+.app{
+  display:flex;
+  margin-top:56px;
+}
+
+/* SIDEBAR */
+.sidebar{
+  width:240px;
+  background:#0f0f0f;
+  border-right:1px solid var(--border);
+  height:calc(100vh - 56px);
+  padding:10px;
+  position:sticky;
+  top:56px;
+}
+
+.side-item{
+  padding:10px;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+.side-item:hover{
+  background:var(--panel);
+}
+
+/* MAIN */
+.main{
+  flex:1;
+  padding:18px;
+}
+
+/* GRID */
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:18px;
-  padding:24px;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:16px;
 }
 
+/* VIDEO CARD */
 .card{
-  background:linear-gradient(145deg, var(--panel), #121212);
-  border:1px solid var(--border);
-  border-radius:16px;
-  overflow:hidden;
   cursor:pointer;
-  transition:0.25s ease;
-  box-shadow: var(--shadow);
 }
 
-.card:hover{
-  transform:translateY(-5px);
-  border-color:rgba(255,0,0,.4);
-}
-
-.card img{
+.thumb{
   width:100%;
-  height:140px;
+  aspect-ratio:16/9;
+  border-radius:14px;
+  overflow:hidden;
+  background:#000;
+}
+
+.thumb img{
+  width:100%;
+  height:100%;
   object-fit:cover;
-  filter:contrast(1.1);
 }
 
 .card h3{
-  margin:0;
-  padding:12px 12px 14px;
-  font-size:15px;
+  font-size:14px;
+  margin:8px 0 0;
 }
 
-/* VIEW */
-#view{
+.meta{
+  font-size:12px;
+  color:var(--muted);
+}
+
+/* WATCH */
+#watch{
   display:none;
-  padding:20px;
 }
 
-/* PLAYER */
-#player{
+.player{
   width:100%;
-  height:520px;
+  aspect-ratio:16/9;
   border-radius:14px;
   overflow:hidden;
-  box-shadow:var(--shadow);
 }
 
-/* BACK BUTTON */
-.back{
-  display:none;
-  margin:14px 20px;
-  padding:10px 14px;
-  background:linear-gradient(135deg, var(--accent), #b30000);
-  border:none;
-  color:white;
-  border-radius:10px;
-  cursor:pointer;
-  font-weight:bold;
-  transition:.2s;
-}
-
-.back:hover{
-  transform:scale(1.03);
-}
-
-/* VIDEO LIST */
-#videos{
-  margin-top:18px;
-  display:grid;
-  gap:12px;
-}
-
-.video{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  padding:12px;
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:14px;
-  cursor:pointer;
-  transition:.2s;
-}
-
-.video:hover{
-  background:var(--panel2);
-  transform:translateX(4px);
-  border-color:rgba(255,0,0,.25);
-}
-
-.video img{
-  width:64px;
-  height:64px;
-  border-radius:12px;
-  object-fit:cover;
-}
-
-.video div{
-  font-size:14px;
-  color:var(--text);
-}
-
-/* small text vibe */
-.muted{
-  color:var(--muted);
-  font-size:12px;
-  margin-top:4px;
-}
-
-/* smooth background glow */
-body::before{
-  content:"";
+/* MINI PLAYER */
+.mini{
   position:fixed;
-  top:-200px;
-  left:-200px;
-  width:500px;
-  height:500px;
-  background:radial-gradient(circle, rgba(255,0,0,.12), transparent 60%);
-  filter:blur(60px);
-  z-index:-1;
+  bottom:10px;
+  right:10px;
+  width:300px;
+  height:170px;
+  display:none;
+  z-index:999;
+  border:1px solid var(--border);
+  background:#000;
 }
 </style>
 </head>
 
 <body>
 
-<div class="header">
+<div class="topbar">
   <div class="logo" onclick="home()">
     <img src="avatar.png">
     RustX Remake
   </div>
 </div>
 
-<button class="back" id="backBtn" onclick="back()">← Назад</button>
+<div class="app">
 
-<div id="grid" class="grid"></div>
+  <div class="sidebar">
+    <div class="side-item" onclick="home()">🏠 Главная</div>
+    <div class="side-item">🔥 Тренды</div>
+    <div class="side-item">📺 Подписки</div>
+  </div>
 
-<div id="view">
-  <div id="player"></div>
-  <div id="videos"></div>
+  <div class="main">
+
+    <!-- HOME -->
+    <div id="home" class="grid"></div>
+
+    <!-- WATCH -->
+    <div id="watch">
+      <div id="player" class="player"></div>
+      <h2 id="title"></h2>
+      <div class="meta" id="channel"></div>
+    </div>
+
+  </div>
+
 </div>
+
+<div id="mini" class="mini"></div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
@@ -215,25 +199,14 @@ const channels = [
     avatar:"marmok.png",
     videos:[
       {
-        title:"Смешной ролик 1",
+        title:"Смешной ролик",
         url:"https://www.youtube.com/watch?v=ysz5S6PUM-U",
         thumb:"https://img.youtube.com/vi/ysz5S6PUM-U/hqdefault.jpg"
       },
       {
-        title:"Смешной ролик 2",
+        title:"Ещё видео",
         url:"https://www.youtube.com/watch?v=ScMzIvxBSi4",
         thumb:"https://img.youtube.com/vi/ScMzIvxBSi4/hqdefault.jpg"
-      }
-    ]
-  },
-  {
-    name:"Rust Channel",
-    avatar:"rust.png",
-    videos:[
-      {
-        title:"Raid Base",
-        url:"https://www.youtube.com/watch?v=ysz5S6PUM-U",
-        thumb:"https://img.youtube.com/vi/ysz5S6PUM-U/hqdefault.jpg"
       }
     ]
   }
@@ -241,51 +214,40 @@ const channels = [
 
 let player=null;
 
-function renderHome(){
-  stopVideo();
+/* HOME */
+function home(){
+  stop();
 
-  document.getElementById("view").style.display="none";
-  document.getElementById("backBtn").style.display="none";
+  document.getElementById("watch").style.display="none";
 
-  const grid=document.getElementById("grid");
+  const grid=document.getElementById("home");
   grid.style.display="grid";
   grid.innerHTML="";
 
-  channels.forEach((ch,i)=>{
-    grid.innerHTML += `
-      <div class="card" onclick="openChannel(${i})">
-        <img src="${ch.avatar}">
-        <h3>${ch.name}</h3>
-      </div>
-    `;
-  });
-}
-
-function openChannel(i){
-  const ch = channels[i];
-
-  document.getElementById("grid").style.display="none";
-  document.getElementById("view").style.display="block";
-  document.getElementById("backBtn").style.display="block";
-
-  const box=document.getElementById("videos");
-  box.innerHTML="";
-
-  ch.videos.forEach(v=>{
-    box.innerHTML += `
-      <div class="video" onclick="play('${v.url}')">
-        <img src="${v.thumb}">
-        <div>
-          ${v.title}
-          <div class="muted">RustX Video</div>
+  channels.forEach(c=>{
+    c.videos.forEach(v=>{
+      grid.innerHTML += `
+        <div class="card" onclick="openVideo('${v.url}','${c.name}')">
+          <div class="thumb">
+            <img src="${v.thumb}">
+          </div>
+          <h3>${v.title}</h3>
+          <div class="meta">${c.name}</div>
         </div>
-      </div>
-    `;
+      `;
+    });
   });
 }
 
-function play(url){
+/* OPEN VIDEO */
+function openVideo(url, channel){
   const id=url.match(/v=([^&]+)/)[1];
+
+  document.getElementById("home").style.display="none";
+  document.getElementById("watch").style.display="block";
+
+  document.getElementById("title").innerText="Видео";
+  document.getElementById("channel").innerText=channel;
 
   if(player){
     player.destroy();
@@ -293,31 +255,20 @@ function play(url){
 
   player=new YT.Player("player",{
     videoId:id,
-    playerVars:{
-      autoplay:1,
-      controls:1
-    }
+    playerVars:{autoplay:1,controls:1}
   });
 }
 
-function back(){
-  stopVideo();
-  renderHome();
-}
-
-function stopVideo(){
+/* STOP */
+function stop(){
   if(player){
     player.destroy();
     player=null;
   }
-  document.getElementById("player").innerHTML="";
 }
 
-function home(){
-  renderHome();
-}
-
-renderHome();
+/* INIT */
+home();
 
 </script>
 
