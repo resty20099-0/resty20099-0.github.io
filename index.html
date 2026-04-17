@@ -40,7 +40,6 @@ h1 {
   margin: 0;
   font-size: 30px;
   color: red;
-  letter-spacing: 1px;
 }
 
 /* SEARCH */
@@ -56,7 +55,6 @@ input {
   padding: 10px;
   border-radius: 8px;
   border: none;
-  outline: none;
 }
 
 button {
@@ -68,14 +66,10 @@ button {
   cursor: pointer;
 }
 
-button:hover {
-  background: darkred;
-}
-
 /* GRID */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 15px;
   padding: 20px;
 }
@@ -83,26 +77,55 @@ button:hover {
 /* CARD */
 .card {
   background: #1a1a1a;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
+  cursor: pointer;
   transition: 0.2s;
 }
 
 .card:hover {
-  transform: scale(1.02);
+  transform: scale(1.03);
+}
+
+.card img {
+  width: 100%;
 }
 
 .card h3 {
-  font-size: 14px;
+  font-size: 13px;
   padding: 10px;
-  margin: 0;
 }
 
-/* VIDEO */
-iframe {
+/* PLAYER MODE */
+.player {
+  display: none;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 15px;
+}
+
+.video-box iframe {
   width: 100%;
-  height: 200px;
-  border: none;
+  height: 420px;
+  border-radius: 10px;
+}
+
+.sidebar {
+  background: #1a1a1a;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.rec {
+  cursor: pointer;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.back {
+  margin: 10px 20px;
+  display: none;
 }
 </style>
 </head>
@@ -116,12 +139,22 @@ iframe {
   </div>
 </header>
 
-<div class="search-box">
+<div class="search-box" id="searchBox">
   <input id="search" placeholder="Поиск видео..." />
   <button onclick="loadVideos()">Поиск</button>
 </div>
 
+<button class="back" id="backBtn" onclick="back()">← Назад</button>
+
 <div id="videos" class="grid"></div>
+
+<!-- PLAYER -->
+<div id="player" class="player">
+  <div class="video-box">
+    <iframe id="mainVideo" allowfullscreen></iframe>
+  </div>
+  <div class="sidebar" id="sidebar"></div>
+</div>
 
 <script>
 const API_KEY = "ТВОЙ_API_KEY";
@@ -145,12 +178,49 @@ async function loadVideos() {
     card.className = "card";
 
     card.innerHTML = `
-      <iframe src="https://www.youtube.com/embed/${videoId}" allowfullscreen></iframe>
+      <img src="${video.snippet.thumbnails.medium.url}" />
       <h3>${video.snippet.title}</h3>
     `;
 
+    card.onclick = () => openVideo(videoId, query);
+
     container.appendChild(card);
   });
+}
+
+async function openVideo(videoId, query) {
+  document.getElementById("videos").style.display = "none";
+  document.getElementById("player").style.display = "grid";
+  document.getElementById("backBtn").style.display = "block";
+
+  document.getElementById("mainVideo").src =
+    `https://www.youtube.com/embed/${videoId}`;
+
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&maxResults=8&type=video&key=${API_KEY}`
+  );
+
+  const data = await res.json();
+
+  const sidebar = document.getElementById("sidebar");
+  sidebar.innerHTML = "<h3>Рекомендации</h3>";
+
+  data.items.forEach(v => {
+    const div = document.createElement("div");
+    div.className = "rec";
+    div.innerText = v.snippet.title;
+
+    div.onclick = () => openVideo(v.id.videoId, query);
+
+    sidebar.appendChild(div);
+  });
+}
+
+function back() {
+  document.getElementById("videos").style.display = "grid";
+  document.getElementById("player").style.display = "none";
+  document.getElementById("backBtn").style.display = "none";
+  document.getElementById("mainVideo").src = "";
 }
 
 loadVideos();
