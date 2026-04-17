@@ -1,529 +1,1340 @@
-const SUPABASE_URL = "https://ufxumoigctmncujfztnh.supabase.co";
-const SUPABASE_ANON_KEY = "ВСТАВЬ_СВОЙ_PUBLISHABLE_KEY";
-const YOUTUBE_API_KEY = "ВСТАВЬ_СВОЙ_YOUTUBE_API_KEY";
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-let state = {
-  videos: [],
-  user: null,
-  currentVideoId: null,
-  player: null,
-  playerReady: false,
-  volume: 50
-};
-
-const els = {
-  sidebar: document.getElementById("sidebar"),
-  menuBtn: document.getElementById("menuBtn"),
-  quickAddBtn: document.getElementById("quickAddBtn"),
-  searchInput: document.getElementById("searchInput"),
-  clearSearchBtn: document.getElementById("clearSearchBtn"),
-  navBtns: [...document.querySelectorAll(".nav-btn")],
-
-  homePage: document.getElementById("homePage"),
-  addPage: document.getElementById("addPage"),
-  authPage: document.getElementById("authPage"),
-  watchPage: document.getElementById("watchPage"),
-
-  videoGrid: document.getElementById("videoGrid"),
-  emptyState: document.getElementById("emptyState"),
-  userPill: document.getElementById("userPill"),
-  statVideos: document.getElementById("statVideos"),
-  statUser: document.getElementById("statUser"),
-
-  videoForm: document.getElementById("videoForm"),
-  urlInput: document.getElementById("urlInput"),
-
-  regEmail: document.getElementById("regEmail"),
-  regPassword: document.getElementById("regPassword"),
-  loginEmail: document.getElementById("loginEmail"),
-  loginPassword: document.getElementById("loginPassword"),
-  registerBtn: document.getElementById("registerBtn"),
-  loginBtn: document.getElementById("loginBtn"),
-  logoutBtn: document.getElementById("logoutBtn"),
-  authStatus: document.getElementById("authStatus"),
-
-  watchPlayer: document.getElementById("watchPlayer"),
-  watchTitle: document.getElementById("watchTitle"),
-  watchChannel: document.getElementById("watchChannel"),
-  watchInfo: document.getElementById("watchInfo"),
-  watchDescription: document.getElementById("watchDescription"),
-  watchAvatar: document.getElementById("watchAvatar"),
-  recommendedList: document.getElementById("recommendedList"),
-  backHomeBtn: document.getElementById("backHomeBtn"),
-  deleteVideoBtn: document.getElementById("deleteVideoBtn"),
-  volumeSlider: document.getElementById("volumeSlider"),
-  volumeValue: document.getElementById("volumeValue")
-};
-
-function escapeHtml(str = "") {
-  return String(str)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function getYouTubeId(value) {
-  const raw = value.trim();
-  if (!raw) return null;
-  if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
-
-  const patterns = [
-    /[?&]v=([a-zA-Z0-9_-]{11})/,
-    /youtu\.be\/([a-zA-Z0-9_-]{11})/,
-    /embed\/([a-zA-Z0-9_-]{11})/,
-    /shorts\/([a-zA-Z0-9_-]{11})/
-  ];
-
-  for (const pattern of patterns) {
-    const match = raw.match(pattern);
-    if (match) return match[1];
-  }
-  return null;
-}
-
-function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
-}
-
-function avatarMarkup(video, size = 40) {
-  const avatar = video.channel_avatar || "";
-  const channel = video.channel_title || "Канал";
-
-  if (avatar) {
-    return `<div class="avatar" style="width:${size}px;height:${size}px;"><img src="${escapeHtml(avatar)}" alt="${escapeHtml(channel)}"></div>`;
-  }
-
-  return `<div class="avatar" style="width:${size}px;height:${size}px;">${escapeHtml(channel.charAt(0).toUpperCase())}</div>`;
-}
-
-function showPage(page) {
-  const pages = {
-    home: els.homePage,
-    add: els.addPage,
-    auth: els.authPage,
-    watch: els.watchPage
-  };
-
-  Object.values(pages).forEach(p => p.classList.add("hidden"));
-  pages[page].classList.remove("hidden");
-
-  els.navBtns.forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.page === page);
-  });
-
-  if (window.innerWidth <= 900) {
-    els.sidebar.classList.remove("open");
-  }
-}
-
-function goTo(page) {
-  const hashMap = {
-    home: "#home",
-    add: "#add",
-    auth: "#auth"
-  };
-  history.pushState({}, "", hashMap[page] || "#home");
-  route();
-}
-
-function route() {
-  const hash = location.hash || "#home";
-
-  if (hash.startsWith("#watch/")) {
-    const id = hash.replace("#watch/", "");
-    openWatchPage(id, true);
-    return;
-  }
-
-  if (hash === "#add") {
-    showPage("add");
-    return;
-  }
-
-  if (hash === "#auth") {
-    showPage("auth");
-    return;
-  }
-
-  showPage("home");
-  renderHome();
-}
-
-function setPlayerVolume(volume) {
-  state.volume = Number(volume);
-  els.volumeSlider.value = state.volume;
-  els.volumeValue.textContent = `${state.volume}%`;
-
-  if (state.player && state.playerReady && typeof state.player.setVolume === "function") {
-    state.player.setVolume(state.volume);
-    if (state.volume === 0 && typeof state.player.mute === "function") state.player.mute();
-    if (state.volume > 0 && typeof state.player.unMute === "function") state.player.unMute();
-  }
-}
-
-function mountPlayer(videoId) {
-  const oldNode = document.getElementById("watchPlayer");
-  const newNode = document.createElement("div");
-  newNode.id = "watchPlayer";
-  newNode.className = "player";
-  oldNode.replaceWith(newNode);
-  els.watchPlayer = newNode;
-  state.playerReady = false;
-
-  state.player = new YT.Player("watchPlayer", {
-    videoId,
-    playerVars: {
-      autoplay: 1,
-      rel: 0,
-      modestbranding: 1
-    },
-    events: {
-      onReady: (event) => {
-        state.playerReady = true;
-        event.target.setVolume(state.volume);
-        if (state.volume === 0) event.target.mute();
-        else event.target.unMute();
-        event.target.playVideo();
-      }
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniTube Pro</title>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --panel: #181818;
+      --panel-2: #202020;
+      --panel-3: #272727;
+      --text: #f1f1f1;
+      --muted: #aaaaaa;
+      --accent: #ff0000;
+      --accent-2: #cc0000;
+      --border: #303030;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
     }
-  });
-}
 
-async function fetchCurrentUser() {
-  const { data, error } = await supabase.auth.getUser();
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
 
-  if (error || !data?.user) {
-    state.user = null;
-  } else {
-    state.user = data.user;
-  }
+    body { overflow-x: hidden; }
+    button, input, textarea, select { font: inherit; }
+    a { color: inherit; text-decoration: none; }
+    .hidden { display: none !important; }
 
-  renderAuthStatus();
-}
+    .app {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
 
-function renderAuthStatus() {
-  els.userPill.textContent = state.user ? `👤 ${state.user.email}` : "Гость";
-  els.authStatus.textContent = state.user ? `Вошёл как: ${state.user.email}` : "Не авторизован";
-  els.statUser.textContent = state.user ? "1" : "0";
-}
+    .sidebar {
+      background: #111;
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
 
-async function register() {
-  const email = els.regEmail.value.trim();
-  const password = els.regPassword.value;
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 22px;
+    }
 
-  if (!email || !password) {
-    alert("Введи email и пароль");
-    return;
-  }
+    .brand-badge {
+      background: var(--accent);
+      padding: 8px 12px;
+      border-radius: 12px;
+      line-height: 1;
+    }
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password
-  });
+    .nav {
+      display: grid;
+      gap: 8px;
+    }
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+    .nav button {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: .2s ease;
+    }
 
-  alert("Регистрация выполнена");
-  await fetchCurrentUser();
-}
+    .nav button:hover,
+    .nav button.active {
+      background: var(--panel-3);
+      border-color: var(--border);
+    }
 
-async function login() {
-  const email = els.loginEmail.value.trim();
-  const password = els.loginPassword.value;
+    .content { min-width: 0; }
 
-  if (!email || !password) {
-    alert("Введи email и пароль");
-    return;
-  }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      background: rgba(15,15,15,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
+    .top-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex: 1;
+    }
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+    .search-wrap {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      max-width: 720px;
+      gap: 8px;
+    }
 
-  alert("Вход выполнен");
-  await fetchCurrentUser();
-}
+    .search-wrap input,
+    input,
+    textarea,
+    select {
+      width: 100%;
+      background: #121212;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 13px;
+      border-radius: 12px;
+      outline: none;
+    }
 
-async function logout() {
-  const { error } = await supabase.auth.signOut();
+    textarea {
+      resize: vertical;
+      min-height: 110px;
+    }
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+    .mobile-menu-btn,
+    .chip-btn,
+    .primary-btn,
+    .ghost-btn,
+    .danger-btn,
+    .card-actions button,
+    .filter-chip {
+      cursor: pointer;
+      transition: .2s ease;
+    }
 
-  state.user = null;
-  renderAuthStatus();
-  alert("Вы вышли");
-  goTo("home");
-}
+    .mobile-menu-btn,
+    .chip-btn,
+    .ghost-btn,
+    .danger-btn,
+    .card-actions button,
+    .filter-chip {
+      background: var(--panel-3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 10px 14px;
+    }
 
-async function loadVideosFromDB() {
-  const { data, error } = await supabase
-    .from("videos")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .primary-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 16px;
+    }
 
-  if (error) {
-    console.error(error);
-    return;
-  }
+    .danger-btn {
+      background: #5c1d1d;
+      color: white;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 16px;
+    }
 
-  state.videos = data || [];
-  els.statVideos.textContent = String(state.videos.length);
-  renderHome();
-}
+    .mobile-menu-btn { display: none; }
 
-function renderHome() {
-  const term = els.searchInput.value.trim().toLowerCase();
+    .top-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
 
-  const videos = state.videos.filter(v => {
-    const text = `${v.title || ""} ${v.channel_title || ""} ${v.description || ""}`.toLowerCase();
-    return !term || text.includes(term);
-  });
+    .user-pill {
+      padding: 10px 14px;
+      background: var(--panel-3);
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
 
-  els.videoGrid.innerHTML = videos.map(v => `
-    <article class="video-card">
-      <div class="thumb-wrap" data-open-id="${v.id}">
-        <img src="${escapeHtml(v.thumbnail_url || "")}" alt="${escapeHtml(v.title || "Видео")}" />
-        <div class="play-overlay"><div class="play-badge">▶</div></div>
+    .section { padding: 18px 16px 32px; }
+
+    .hero,
+    .form-card,
+    .login-card,
+    .watch-layout,
+    .empty-state {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      padding: 20px;
+      margin-bottom: 18px;
+      background: linear-gradient(135deg, #1f1f1f, #121212);
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+    }
+
+    .hero p,
+    .hint,
+    .meta,
+    .desc,
+    .footer-note {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      background: #121212;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 14px;
+      min-width: 120px;
+    }
+
+    .stat .n {
+      display: block;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .filters {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .filter-chip.active {
+      background: var(--text);
+      color: #111;
+      border-color: transparent;
+    }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 18px;
+    }
+
+    .video-card {
+      border-radius: 18px;
+      overflow: hidden;
+      transition: transform .18s ease;
+    }
+
+    .video-card:hover { transform: translateY(-3px); }
+
+    .thumb-wrap {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 18px;
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+    }
+
+    .thumb-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .play-overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(to top, rgba(0,0,0,.45), rgba(0,0,0,.15));
+    }
+
+    .play-badge {
+      background: rgba(0,0,0,.7);
+      border: 1px solid rgba(255,255,255,.15);
+      width: 64px;
+      height: 64px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+    }
+
+    .duration {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      font-size: 12px;
+      background: rgba(0,0,0,.82);
+      padding: 4px 6px;
+      border-radius: 8px;
+    }
+
+    .card-body {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 12px;
+      padding: 12px 4px 0;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #ff4d4d, #7a0000);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .video-title {
+      margin: 0 0 6px;
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .form-card,
+    .login-card {
+      padding: 18px;
+      max-width: 760px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .full { grid-column: 1 / -1; }
+
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .watch-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
+      padding: 18px;
+    }
+
+    .player {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: none;
+      border-radius: 18px;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .watch-title {
+      font-size: 28px;
+      margin: 14px 0 10px;
+    }
+
+    .watch-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .channel-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .channel-info strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .watch-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .watch-description {
+      margin-top: 14px;
+      padding: 14px;
+      background: #121212;
+      border-radius: 16px;
+      color: #ddd;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .side-list {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .mini-item {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .mini-item img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      border-radius: 14px;
+      background: #000;
+    }
+
+    .mini-item h4 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .empty-state {
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    @media (max-width: 1100px) {
+      .watch-layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: fixed;
+        z-index: 40;
+        left: 0;
+        top: 0;
+        transform: translateX(-105%);
+        transition: transform .2s ease;
+        width: 260px;
+      }
+      .sidebar.open { transform: translateX(0); }
+      .mobile-menu-btn { display: inline-block; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .top-left, .top-right { width: 100%; }
+      .search-wrap { max-width: none; }
+      .mini-item { grid-template-columns: 120px 1fr; }
+      .hero h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-badge">▶</span>
+        <span>MiniTube</span>
       </div>
-      <div class="card-body">
-        ${avatarMarkup(v)}
-        <div>
-          <h3 class="video-title">${escapeHtml(v.title || "Без названия")}</h3>
-          <div class="meta">${escapeHtml(v.channel_title || "Без канала")}</div>
-          <div class="meta">${formatDate(v.created_at)}</div>
-          <div class="desc">${escapeHtml((v.description || "").slice(0, 90))}${v.description && v.description.length > 90 ? "…" : ""}</div>
-          <div class="card-actions">
-            <button data-open-id="${v.id}" type="button">Смотреть</button>
+
+      <nav class="nav">
+        <button class="nav-btn active" data-page="home">🏠 Главная</button>
+        <button class="nav-btn" data-page="add">➕ Добавить видео</button>
+        <button class="nav-btn" data-page="login">🔐 Авторизация</button>
+      </nav>
+
+      <p class="footer-note">
+        Одностраничный MiniTube с локальным сохранением, редактированием видео, загрузкой аватара и управлением громкостью.
+      </p>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div class="top-left">
+          <button class="mobile-menu-btn" id="menuBtn">☰</button>
+          <div class="search-wrap">
+            <input id="searchInput" type="text" placeholder="Поиск видео по названию, автору или описанию..." />
+            <button class="chip-btn" id="clearSearchBtn" type="button">Очистить</button>
           </div>
         </div>
-      </div>
-    </article>
-  `).join("");
 
-  els.emptyState.classList.toggle("hidden", videos.length > 0);
+        <div class="top-right">
+          <div class="user-pill" id="userPill">Гость</div>
+          <button class="primary-btn" id="quickAddBtn" type="button">Добавить</button>
+        </div>
+      </header>
 
-  [...document.querySelectorAll("[data-open-id]")].forEach(el => {
-    el.addEventListener("click", () => openWatchPage(el.dataset.openId));
-  });
-}
+      <section class="section" id="homePage">
+        <div class="hero">
+          <div>
+            <h1>MiniTube Pro</h1>
+            <p>Здесь есть авторизация, добавление видео, сохранение в localStorage, загрузка аватара, отдельная страница просмотра, редактирование и регулировка громкости.</p>
+          </div>
+          <div class="stats">
+            <div class="stat"><span class="n" id="statVideos">0</span>Видео</div>
+            <div class="stat"><span class="n" id="statUser">0</span>Пользователь</div>
+            <div class="stat"><span class="n" id="statSaved">0</span>Сохранено</div>
+          </div>
+        </div>
 
-async function openWatchPage(id, routed = false) {
-  const video = state.videos.find(v => String(v.id) === String(id));
-  if (!video) {
-    goTo("home");
-    return;
-  }
+        <div class="filters" id="filters"></div>
+        <div class="video-grid" id="videoGrid"></div>
+        <div class="empty-state hidden" id="emptyState">Ничего не найдено. Попробуй другой запрос или добавь новое видео.</div>
+      </section>
 
-  state.currentVideoId = id;
-  showPage("watch");
-  mountPlayer(video.youtube_id);
+      <section class="section hidden" id="addPage">
+        <div class="form-card">
+          <h2 id="formTitle">Добавить новое видео</h2>
+          <p class="hint">Поддерживается обычная ссылка YouTube, короткая ссылка youtu.be и прямая вставка ID видео. Аватар можно загрузить файлом, вставить ссылкой или подтянуть через YouTube API.</p>
+          <form id="videoForm" class="form-grid">
+            <label>
+              Название видео
+              <input type="text" id="titleInput" required placeholder="Например: Мой лучший влог" />
+            </label>
 
-  els.watchTitle.textContent = video.title || "Без названия";
-  els.watchChannel.textContent = video.channel_title || "Без канала";
-  els.watchInfo.textContent = formatDate(video.created_at);
-  els.watchDescription.textContent = video.description || "Описание отсутствует.";
+            <label>
+              Автор / канал
+              <input type="text" id="channelInput" required placeholder="Например: Marin Channel" />
+            </label>
 
-  if (video.channel_avatar) {
-    els.watchAvatar.innerHTML = `<img src="${escapeHtml(video.channel_avatar)}" alt="${escapeHtml(video.channel_title || "")}">`;
-  } else {
-    els.watchAvatar.textContent = (video.channel_title || "M").charAt(0).toUpperCase();
-  }
+            <label class="full">
+              Ссылка YouTube или ID
+              <input type="text" id="urlInput" required placeholder="https://www.youtube.com/watch?v=..." />
+            </label>
 
-  const recommended = state.videos.filter(v => String(v.id) !== String(id)).slice(0, 8);
-  els.recommendedList.innerHTML = recommended.map(v => `
-    <div class="mini-item" data-open-id="${v.id}">
-      <img src="${escapeHtml(v.thumbnail_url || "")}" alt="${escapeHtml(v.title || "")}" />
-      <div>
-        <h4>${escapeHtml(v.title || "Без названия")}</h4>
-        <div class="meta">${escapeHtml(v.channel_title || "Без канала")}</div>
-      </div>
-    </div>
-  `).join("");
+            <label>
+              Категория
+              <select id="categoryInput">
+                <option>Все</option>
+                <option>Музыка</option>
+                <option>Игры</option>
+                <option>Обучение</option>
+                <option>Развлечения</option>
+                <option>Влоги</option>
+                <option>Технологии</option>
+              </select>
+            </label>
 
-  [...els.recommendedList.querySelectorAll("[data-open-id]")].forEach(item => {
-    item.addEventListener("click", () => openWatchPage(item.dataset.openId));
-  });
+            <label>
+              Длительность
+              <input type="text" id="durationInput" placeholder="Например: 12:45" />
+            </label>
 
-  setPlayerVolume(state.volume);
+            <label>
+              Аватар автора (загрузка файла)
+              <input type="file" id="avatarFileInput" accept="image/*" />
+            </label>
 
-  if (!routed) {
-    history.pushState({}, "", `#watch/${id}`);
-  }
-}
+            <label>
+              Или ссылка на аватар (необязательно)
+              <input type="text" id="avatarInput" placeholder="https://site.com/avatar.jpg" />
+            </label>
 
-async function deleteCurrentVideo() {
-  if (!state.currentVideoId) return;
-  if (!state.user) {
-    alert("Сначала войди в аккаунт");
-    return;
-  }
+            <label class="full">
+              Описание
+              <textarea id="descriptionInput" placeholder="Краткое описание ролика..."></textarea>
+            </label>
 
-  const target = state.videos.find(v => String(v.id) === String(state.currentVideoId));
-  if (!target) return;
+            <div class="full" style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="primary-btn" type="submit" id="saveVideoBtn">Сохранить видео</button>
+              <button class="ghost-btn" type="button" id="cancelEditBtn">Отмена</button>
+            </div>
+          </form>
+        </div>
+      </section>
 
-  if (target.user_id !== state.user.id) {
-    alert("Ты можешь удалить только своё видео");
-    return;
-  }
+      <section class="section hidden" id="loginPage">
+        <div class="login-card">
+          <h2>Авторизация</h2>
+          <p class="hint">Это демонстрационная локальная авторизация. Имя пользователя сохраняется в браузере.</p>
+          <form id="loginForm" class="form-grid">
+            <label>
+              Имя пользователя
+              <input type="text" id="usernameInput" required placeholder="Например: Marin" />
+            </label>
 
-  if (!confirm(`Удалить видео «${target.title}»?`)) return;
+            <label>
+              Пароль
+              <input type="password" id="passwordInput" required placeholder="Минимум 4 символа" />
+            </label>
 
-  const { error } = await supabase
-    .from("videos")
-    .delete()
-    .eq("id", target.id);
+            <div class="full" style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="primary-btn" type="submit">Войти</button>
+              <button class="danger-btn" type="button" id="logoutBtn">Выйти</button>
+            </div>
+          </form>
+          <p class="footer-note" id="loginStatus">Сейчас вы не авторизованы.</p>
+        </div>
+      </section>
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+      <section class="section hidden" id="watchPage">
+        <div class="watch-layout">
+          <div>
+            <div id="watchPlayer" class="player"></div>
+            <h2 class="watch-title" id="watchTitle"></h2>
+            <div class="watch-meta">
+              <div class="channel-box">
+                <div class="avatar" id="watchAvatar">M</div>
+                <div class="channel-info">
+                  <strong id="watchChannel"></strong>
+                  <span class="meta" id="watchInfo"></span>
+                </div>
+              </div>
+              <div class="watch-actions">
+                <button class="ghost-btn" id="backHomeBtn" type="button">← Назад</button>
+                <button class="primary-btn" id="editVideoBtn" type="button">Редактировать</button>
+                <button class="danger-btn" id="deleteVideoBtn" type="button">Удалить</button>
+              </div>
+            </div>
 
-  await loadVideosFromDB();
-  goTo("home");
-}
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+              <label style="display:flex; align-items:center; gap:10px; color:var(--text);">
+                Громкость
+                <input type="range" id="volumeSlider" min="0" max="100" value="50" style="width:180px;" />
+              </label>
+              <span class="meta" id="volumeValue">50%</span>
+            </div>
 
-async function fetchYoutubeData(youtubeId) {
-  const videoRes = await fetch(
-    `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${youtubeId}&key=${YOUTUBE_API_KEY}`
-  );
-  const videoData = await videoRes.json();
-  const snippet = videoData.items?.[0]?.snippet;
+            <div class="watch-description" id="watchDescription"></div>
+          </div>
 
-  if (!snippet) return null;
+          <aside>
+            <h3 style="margin-top:0;">Следующие видео</h3>
+            <div class="side-list" id="recommendedList"></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </div>
 
-  const channelId = snippet.channelId || "";
-  let channelAvatar = "";
+  <script>
+    const STORAGE_KEYS = {
+      videos: 'minitube_videos_v4',
+      user: 'minitube_user_v4',
+      volume: 'minitube_volume_v1'
+    };
 
-  if (channelId) {
-    const channelRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${YOUTUBE_API_KEY}`
-    );
-    const channelData = await channelRes.json();
-    const channelSnippet = channelData.items?.[0]?.snippet;
+    const YOUTUBE_API_KEY = '';
 
-    channelAvatar =
-      channelSnippet?.thumbnails?.high?.url ||
-      channelSnippet?.thumbnails?.medium?.url ||
-      channelSnippet?.thumbnails?.default?.url ||
-      "";
-  }
+    const defaultVideos = [
+      {
+        id: crypto.randomUUID(),
+        youtubeId: 'Rkwo_U-ARl8',
+        title: 'Марин видео',
+        channel: 'Marin Channel',
+        avatar: 'https://i.pravatar.cc/100?img=1',
+        description: 'Демо-видео для стартовой главной страницы MiniTube.',
+        category: 'Развлечения',
+        duration: '6:21',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        youtubeId: 'ysz5S6PUM-U',
+        title: 'Пример видео 2',
+        channel: 'Demo Creator',
+        avatar: 'https://i.pravatar.cc/100?img=12',
+        description: 'Второй ролик для примера карточек и отдельной страницы просмотра.',
+        category: 'Музыка',
+        duration: '3:52',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: crypto.randomUUID(),
+        youtubeId: 'ScMzIvxBSi4',
+        title: 'Пример видео 3',
+        channel: 'Code Studio',
+        avatar: 'https://i.pravatar.cc/100?img=22',
+        description: 'Третий ролик: можно искать, открывать, редактировать и удалять.',
+        category: 'Обучение',
+        duration: '10:08',
+        createdAt: new Date().toISOString()
+      }
+    ];
 
-  return {
-    title: snippet.title || "",
-    description: snippet.description || "",
-    channel_title: snippet.channelTitle || "",
-    channel_avatar: channelAvatar,
-    thumbnail_url:
-      snippet.thumbnails?.high?.url ||
-      snippet.thumbnails?.medium?.url ||
-      snippet.thumbnails?.default?.url ||
-      ""
-  };
-}
+    let state = {
+      videos: [],
+      user: null,
+      search: '',
+      category: 'Все',
+      currentVideoId: null,
+      editingVideoId: null,
+      volume: 50,
+      player: null,
+      playerReady: false
+    };
 
-async function handleAddVideo(e) {
-  e.preventDefault();
+    const els = {
+      sidebar: document.getElementById('sidebar'),
+      menuBtn: document.getElementById('menuBtn'),
+      quickAddBtn: document.getElementById('quickAddBtn'),
+      searchInput: document.getElementById('searchInput'),
+      clearSearchBtn: document.getElementById('clearSearchBtn'),
+      navBtns: [...document.querySelectorAll('.nav-btn')],
 
-  if (!state.user) {
-    alert("Сначала войди в аккаунт");
-    return;
-  }
+      homePage: document.getElementById('homePage'),
+      addPage: document.getElementById('addPage'),
+      loginPage: document.getElementById('loginPage'),
+      watchPage: document.getElementById('watchPage'),
 
-  const link = els.urlInput.value.trim();
-  const youtubeId = getYouTubeId(link);
+      videoGrid: document.getElementById('videoGrid'),
+      emptyState: document.getElementById('emptyState'),
+      filters: document.getElementById('filters'),
+      userPill: document.getElementById('userPill'),
+      statVideos: document.getElementById('statVideos'),
+      statUser: document.getElementById('statUser'),
+      statSaved: document.getElementById('statSaved'),
 
-  if (!youtubeId) {
-    alert("Неверная YouTube ссылка");
-    return;
-  }
+      videoForm: document.getElementById('videoForm'),
+      formTitle: document.getElementById('formTitle'),
+      saveVideoBtn: document.getElementById('saveVideoBtn'),
+      cancelEditBtn: document.getElementById('cancelEditBtn'),
+      titleInput: document.getElementById('titleInput'),
+      channelInput: document.getElementById('channelInput'),
+      urlInput: document.getElementById('urlInput'),
+      categoryInput: document.getElementById('categoryInput'),
+      durationInput: document.getElementById('durationInput'),
+      avatarFileInput: document.getElementById('avatarFileInput'),
+      avatarInput: document.getElementById('avatarInput'),
+      descriptionInput: document.getElementById('descriptionInput'),
 
-  const yt = await fetchYoutubeData(youtubeId);
+      loginForm: document.getElementById('loginForm'),
+      usernameInput: document.getElementById('usernameInput'),
+      passwordInput: document.getElementById('passwordInput'),
+      logoutBtn: document.getElementById('logoutBtn'),
+      loginStatus: document.getElementById('loginStatus'),
 
-  if (!yt) {
-    alert("Не удалось получить данные видео");
-    return;
-  }
+      watchPlayer: document.getElementById('watchPlayer'),
+      watchTitle: document.getElementById('watchTitle'),
+      watchChannel: document.getElementById('watchChannel'),
+      watchInfo: document.getElementById('watchInfo'),
+      watchDescription: document.getElementById('watchDescription'),
+      watchAvatar: document.getElementById('watchAvatar'),
+      recommendedList: document.getElementById('recommendedList'),
+      deleteVideoBtn: document.getElementById('deleteVideoBtn'),
+      editVideoBtn: document.getElementById('editVideoBtn'),
+      backHomeBtn: document.getElementById('backHomeBtn'),
+      volumeSlider: document.getElementById('volumeSlider'),
+      volumeValue: document.getElementById('volumeValue')
+    };
 
-  const { error } = await supabase.from("videos").insert([
-    {
-      user_id: state.user.id,
-      youtube_url: link,
-      youtube_id: youtubeId,
-      title: yt.title,
-      description: yt.description,
-      channel_title: yt.channel_title,
-      channel_avatar: yt.channel_avatar,
-      thumbnail_url: yt.thumbnail_url
+    function loadState() {
+      const savedVideos = localStorage.getItem(STORAGE_KEYS.videos);
+      const savedUser = localStorage.getItem(STORAGE_KEYS.user);
+      const savedVolume = localStorage.getItem(STORAGE_KEYS.volume);
+
+      state.videos = savedVideos ? JSON.parse(savedVideos) : defaultVideos;
+      state.user = savedUser ? JSON.parse(savedUser) : null;
+      state.volume = savedVolume ? Number(savedVolume) : 50;
+      persist();
     }
-  ]);
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+    function persist() {
+      localStorage.setItem(STORAGE_KEYS.videos, JSON.stringify(state.videos));
+      localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(state.user));
+      localStorage.setItem(STORAGE_KEYS.volume, String(state.volume));
+    }
 
-  els.urlInput.value = "";
-  alert("Видео добавлено");
-  await loadVideosFromDB();
-  goTo("home");
-}
+    function escapeHtml(str = '') {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
 
-function bindEvents() {
-  els.menuBtn.addEventListener("click", () => {
-    els.sidebar.classList.toggle("open");
-  });
+    function getYouTubeId(value) {
+      const raw = value.trim();
+      if (!raw) return null;
+      if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
 
-  els.quickAddBtn.addEventListener("click", () => goTo("add"));
-  els.clearSearchBtn.addEventListener("click", () => {
-    els.searchInput.value = "";
-    renderHome();
-  });
+      const patterns = [
+        /[?&]v=([a-zA-Z0-9_-]{11})/,
+        /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+        /embed\/([a-zA-Z0-9_-]{11})/,
+        /shorts\/([a-zA-Z0-9_-]{11})/
+      ];
 
-  els.searchInput.addEventListener("input", renderHome);
+      for (const pattern of patterns) {
+        const match = raw.match(pattern);
+        if (match) return match[1];
+      }
+      return null;
+    }
 
-  els.navBtns.forEach(btn => {
-    btn.addEventListener("click", () => {
-      goTo(btn.dataset.page);
-    });
-  });
+    function thumbUrl(youtubeId) {
+      return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+    }
 
-  els.videoForm.addEventListener("submit", handleAddVideo);
-  els.registerBtn.addEventListener("click", register);
-  els.loginBtn.addEventListener("click", login);
-  els.logoutBtn.addEventListener("click", logout);
-  els.backHomeBtn.addEventListener("click", () => goTo("home"));
-  els.deleteVideoBtn.addEventListener("click", deleteCurrentVideo);
-  els.volumeSlider.addEventListener("input", e => setPlayerVolume(e.target.value));
+    function initials(name = 'M') {
+      return name.trim().charAt(0).toUpperCase() || 'M';
+    }
 
-  window.addEventListener("hashchange", route);
-}
+    function formatDate(dateStr) {
+      return new Date(dateStr).toLocaleDateString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
 
-async function init() {
-  bindEvents();
-  await fetchCurrentUser();
-  await loadVideosFromDB();
-  setPlayerVolume(state.volume);
-  route();
-}
+    function avatarMarkup(video, size = 40) {
+      if (video.avatar) {
+        return `<div class="avatar" style="width:${size}px;height:${size}px;"><img src="${escapeHtml(video.avatar)}" alt="${escapeHtml(video.channel)}"></div>`;
+      }
+      return `<div class="avatar" style="width:${size}px;height:${size}px;">${escapeHtml(initials(video.channel))}</div>`;
+    }
 
-init();
+    async function fetchChannelAvatarByVideoId(youtubeId) {
+      if (!YOUTUBE_API_KEY) return null;
+      try {
+        const videoRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${youtubeId}&key=${YOUTUBE_API_KEY}`);
+        const videoData = await videoRes.json();
+        const item = videoData.items && videoData.items[0];
+        const channelId = item && item.snippet && item.snippet.channelId;
+        if (!channelId) return null;
+
+        const channelRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${YOUTUBE_API_KEY}`);
+        const channelData = await channelRes.json();
+        const channelItem = channelData.items && channelData.items[0];
+
+        return channelItem?.snippet?.thumbnails?.high?.url
+          || channelItem?.snippet?.thumbnails?.medium?.url
+          || channelItem?.snippet?.thumbnails?.default?.url
+          || null;
+      } catch (error) {
+        console.error('Не удалось загрузить аватар канала:', error);
+        return null;
+      }
+    }
+
+    function getCategories() {
+      const set = new Set(['Все']);
+      state.videos.forEach(v => set.add(v.category || 'Все'));
+      return [...set];
+    }
+
+    function filteredVideos() {
+      const term = state.search.trim().toLowerCase();
+      return state.videos
+        .filter(v => {
+          const categoryOk = state.category === 'Все' || (v.category || 'Все') === state.category;
+          const text = `${v.title} ${v.channel} ${v.description}`.toLowerCase();
+          const searchOk = !term || text.includes(term);
+          return categoryOk && searchOk;
+        })
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    function renderFilters() {
+      const cats = getCategories();
+      els.filters.innerHTML = cats.map(cat => `
+        <button class="filter-chip ${cat === state.category ? 'active' : ''}" data-cat="${escapeHtml(cat)}" type="button">${escapeHtml(cat)}</button>
+      `).join('');
+
+      [...els.filters.querySelectorAll('.filter-chip')].forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.category = btn.dataset.cat;
+          renderHome();
+        });
+      });
+    }
+
+    function renderHeaderStats() {
+      els.userPill.textContent = state.user ? `👤 ${state.user.username}` : 'Гость';
+      els.statVideos.textContent = String(state.videos.length);
+      els.statUser.textContent = state.user ? '1' : '0';
+      els.statSaved.textContent = localStorage.getItem(STORAGE_KEYS.videos) ? '1' : '0';
+      els.loginStatus.textContent = state.user
+        ? `Вы вошли как ${state.user.username}.`
+        : 'Сейчас вы не авторизованы.';
+    }
+
+    function renderHome() {
+      renderFilters();
+      const videos = filteredVideos();
+
+      els.videoGrid.innerHTML = videos.map(v => `
+        <article class="video-card">
+          <div class="thumb-wrap" data-open-id="${v.id}">
+            <img src="${thumbUrl(v.youtubeId)}" alt="${escapeHtml(v.title)}" />
+            <div class="play-overlay"><div class="play-badge">▶</div></div>
+            <div class="duration">${escapeHtml(v.duration || '—')}</div>
+          </div>
+          <div class="card-body">
+            ${avatarMarkup(v)}
+            <div>
+              <h3 class="video-title">${escapeHtml(v.title)}</h3>
+              <div class="meta">${escapeHtml(v.channel)}</div>
+              <div class="meta">${escapeHtml(v.category || 'Все')} • ${formatDate(v.createdAt)}</div>
+              <div class="desc">${escapeHtml((v.description || '').slice(0, 90))}${v.description && v.description.length > 90 ? '…' : ''}</div>
+              <div class="card-actions">
+                <button data-open-id="${v.id}" type="button">Смотреть</button>
+                <button data-edit-id="${v.id}" type="button">Редактировать</button>
+                <button data-delete-id="${v.id}" type="button">Удалить</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      `).join('');
+
+      els.emptyState.classList.toggle('hidden', videos.length > 0);
+
+      [...document.querySelectorAll('[data-open-id]')].forEach(el => {
+        el.addEventListener('click', () => openWatchPage(el.dataset.openId));
+      });
+
+      [...document.querySelectorAll('[data-edit-id]')].forEach(el => {
+        el.addEventListener('click', () => startEditVideo(el.dataset.editId));
+      });
+
+      [...document.querySelectorAll('[data-delete-id]')].forEach(el => {
+        el.addEventListener('click', () => deleteVideo(el.dataset.deleteId));
+      });
+
+      renderHeaderStats();
+    }
+
+    function resetFormMode() {
+      state.editingVideoId = null;
+      els.formTitle.textContent = 'Добавить новое видео';
+      els.saveVideoBtn.textContent = 'Сохранить видео';
+      els.videoForm.reset();
+      els.avatarFileInput.value = '';
+    }
+
+    function fillFormForEdit(video) {
+      els.formTitle.textContent = 'Редактировать видео';
+      els.saveVideoBtn.textContent = 'Сохранить изменения';
+      els.titleInput.value = video.title || '';
+      els.channelInput.value = video.channel || '';
+      els.urlInput.value = video.youtubeId || '';
+      els.categoryInput.value = video.category || 'Все';
+      els.durationInput.value = video.duration || '';
+      els.descriptionInput.value = video.description || '';
+      els.avatarInput.value = video.avatar && !video.avatar.startsWith('data:') ? video.avatar : '';
+      els.avatarFileInput.value = '';
+    }
+
+    function showPage(page) {
+      const pageMap = {
+        home: els.homePage,
+        add: els.addPage,
+        login: els.loginPage,
+        watch: els.watchPage
+      };
+
+      Object.values(pageMap).forEach(p => p.classList.add('hidden'));
+      pageMap[page].classList.remove('hidden');
+
+      els.navBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.page === page);
+      });
+
+      if (window.innerWidth <= 900) {
+        els.sidebar.classList.remove('open');
+      }
+    }
+
+    function goTo(page) {
+      const hashMap = {
+        home: '#home',
+        add: '#add',
+        login: '#login'
+      };
+      history.pushState({}, '', hashMap[page] || '#home');
+      route();
+    }
+
+    function route() {
+      const hash = location.hash || '#home';
+      if (hash.startsWith('#watch/')) {
+        const id = hash.replace('#watch/', '');
+        openWatchPage(id, true);
+        return;
+      }
+      if (hash === '#add') {
+        showPage('add');
+        return;
+      }
+      if (hash === '#login') {
+        showPage('login');
+        return;
+      }
+      showPage('home');
+      renderHome();
+    }
+
+    function ensureYouTubeApi() {
+      if (window.YT && window.YT.Player) return Promise.resolve();
+      if (window.__minitubeYtPromise) return window.__minitubeYtPromise;
+
+      window.__minitubeYtPromise = new Promise(resolve => {
+        const existing = document.querySelector('script[data-youtube-api="true"]');
+        if (!existing) {
+          const script = document.createElement('script');
+          script.src = 'https://www.youtube.com/iframe_api';
+          script.dataset.youtubeApi = 'true';
+          document.head.appendChild(script);
+        }
+        const prev = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = function() {
+          if (typeof prev === 'function') prev();
+          resolve();
+        };
+      });
+
+      return window.__minitubeYtPromise;
+    }
+
+    function setPlayerVolume(volume) {
+      state.volume = Number(volume);
+      els.volumeSlider.value = state.volume;
+      els.volumeValue.textContent = `${state.volume}%`;
+      if (state.player && state.playerReady && typeof state.player.setVolume === 'function') {
+        state.player.setVolume(state.volume);
+        if (state.volume === 0 && typeof state.player.mute === 'function') state.player.mute();
+        if (state.volume > 0 && typeof state.player.unMute === 'function') state.player.unMute();
+      }
+      persist();
+    }
+
+    async function mountPlayer(videoId) {
+      await ensureYouTubeApi();
+
+      const oldNode = document.getElementById('watchPlayer');
+      const newNode = document.createElement('div');
+      newNode.id = 'watchPlayer';
+      newNode.className = 'player';
+      oldNode.replaceWith(newNode);
+      els.watchPlayer = newNode;
+      state.playerReady = false;
+
+      state.player = new YT.Player('watchPlayer', {
+        videoId,
+        playerVars: {
+          autoplay: 1,
+          rel: 0,
+          modestbranding: 1
+        },
+        events: {
+          onReady: (event) => {
+            state.playerReady = true;
+            event.target.setVolume(state.volume);
+            if (state.volume === 0) event.target.mute();
+            else event.target.unMute();
+            event.target.playVideo();
+          }
+        }
+      });
+    }
+
+    async function openWatchPage(id, routed = false) {
+      const video = state.videos.find(v => v.id === id);
+      if (!video) {
+        goTo('home');
+        return;
+      }
+
+      state.currentVideoId = id;
+      showPage('watch');
+      await mountPlayer(video.youtubeId);
+
+      els.watchTitle.textContent = video.title;
+      els.watchChannel.textContent = video.channel;
+      els.watchInfo.textContent = `${video.category || 'Все'} • ${video.duration || '—'} • ${formatDate(video.createdAt)}`;
+      els.watchDescription.textContent = video.description || 'Описание отсутствует.';
+
+      if (video.avatar) {
+        els.watchAvatar.innerHTML = `<img src="${escapeHtml(video.avatar)}" alt="${escapeHtml(video.channel)}">`;
+      } else {
+        els.watchAvatar.textContent = initials(video.channel);
+      }
+
+      const recommended = state.videos.filter(v => v.id !== id).slice(0, 8);
+      els.recommendedList.innerHTML = recommended.map(v => `
+        <div class="mini-item" data-open-id="${v.id}">
+          <img src="${thumbUrl(v.youtubeId)}" alt="${escapeHtml(v.title)}" />
+          <div>
+            <h4>${escapeHtml(v.title)}</h4>
+            <div class="meta">${escapeHtml(v.channel)}</div>
+            <div class="meta">${escapeHtml(v.duration || '—')} • ${escapeHtml(v.category || 'Все')}</div>
+          </div>
+        </div>
+      `).join('');
+
+      [...els.recommendedList.querySelectorAll('[data-open-id]')].forEach(item => {
+        item.addEventListener('click', () => openWatchPage(item.dataset.openId));
+      });
+
+      setPlayerVolume(state.volume);
+      if (!routed) {
+        history.pushState({}, '', `#watch/${id}`);
+      }
+    }
+
+    function startEditVideo(id) {
+      const video = state.videos.find(v => v.id === id);
+      if (!video) return;
+      state.editingVideoId = id;
+      fillFormForEdit(video);
+      goTo('add');
+    }
+
+    function deleteVideo(id) {
+      const video = state.videos.find(v => v.id === id);
+      if (!video) return;
+      if (!confirm(`Удалить видео «${video.title}»?`)) return;
+
+      state.videos = state.videos.filter(v => v.id !== id);
+      persist();
+      renderHome();
+
+      if (state.currentVideoId === id) {
+        state.currentVideoId = null;
+        goTo('home');
+      }
+    }
+
+    async function handleAddVideo(e) {
+      e.preventDefault();
+
+      const youtubeId = getYouTubeId(els.urlInput.value);
+      if (!youtubeId) {
+        alert('Не удалось распознать YouTube ID. Вставь корректную ссылку или ID видео.');
+        return;
+      }
+
+      const title = els.titleInput.value.trim();
+      const channel = els.channelInput.value.trim();
+      const description = els.descriptionInput.value.trim();
+      const category = els.categoryInput.value;
+      const duration = els.durationInput.value.trim() || 'Новое';
+
+      let avatar = '';
+      const file = els.avatarFileInput.files[0];
+
+      if (file) {
+        avatar = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (!avatar) {
+        avatar = els.avatarInput.value.trim();
+      }
+
+      if (!avatar && state.editingVideoId) {
+        avatar = state.videos.find(v => v.id === state.editingVideoId)?.avatar || '';
+      }
+
+      if (!avatar) {
+        avatar = await fetchChannelAvatarByVideoId(youtubeId) || '';
+      }
+
+      const existingCreatedAt = state.editingVideoId
+        ? (state.videos.find(v => v.id === state.editingVideoId)?.createdAt || new Date().toISOString())
+        : new Date().toISOString();
+
+      const newVideo = {
+        id: state.editingVideoId || crypto.randomUUID(),
+        youtubeId,
+        title,
+        channel,
+        avatar,
+        description,
+        category,
+        duration,
+        createdAt: existingCreatedAt
+      };
+
+      const wasEditing = !!state.editingVideoId;
+
+      if (state.editingVideoId) {
+        state.videos = state.videos.map(v => v.id === state.editingVideoId ? newVideo : v);
+      } else {
+        state.videos.unshift(newVideo);
+      }
+
+      persist();
+      resetFormMode();
+      state.category = 'Все';
+      state.search = '';
+      els.searchInput.value = '';
+      renderHome();
+      goTo('home');
+      alert(wasEditing ? 'Изменения сохранены.' : 'Видео добавлено и сохранено в браузере.');
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const username = els.usernameInput.value.trim();
+      const password = els.passwordInput.value;
+
+      if (username.length < 2) {
+        alert('Имя пользователя должно быть минимум из 2 символов.');
+        return;
+      }
+      if (password.length < 4) {
+        alert('Пароль должен быть минимум из 4 символов.');
+        return;
+      }
+
+      state.user = {
+        username,
+        loggedAt: new Date().toISOString()
+      };
+      persist();
+      renderHeaderStats();
+      alert(`Добро пожаловать, ${username}!`);
+      goTo('home');
+    }
+
+    function logout() {
+      state.user = null;
+      persist();
+      renderHeaderStats();
+      alert('Вы вышли из аккаунта.');
+    }
+
+    function bindEvents() {
+      els.menuBtn.addEventListener('click', () => {
+        els.sidebar.classList.toggle('open');
+      });
+
+      els.quickAddBtn.addEventListener('click', () => {
+        resetFormMode();
+        goTo('add');
+      });
+
+      els.clearSearchBtn.addEventListener('click', () => {
+        state.search = '';
+        els.searchInput.value = '';
+        renderHome();
+      });
+
+      els.searchInput.addEventListener('input', (e) => {
+        state.search = e.target.value;
+        if (!location.hash.startsWith('#home')) {
+          history.pushState({}, '', '#home');
+          showPage('home');
+        }
+        renderHome();
+      });
+
+      els.navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (btn.dataset.page === 'add') resetFormMode();
+          goTo(btn.dataset.page);
+        });
+      });
+
+      els.videoForm.addEventListener('submit', handleAddVideo);
+      els.cancelEditBtn.addEventListener('click', () => {
+        resetFormMode();
+        goTo('home');
+      });
+      els.loginForm.addEventListener('submit', handleLogin);
+      els.logoutBtn.addEventListener('click', logout);
+      els.backHomeBtn.addEventListener('click', () => goTo('home'));
+      els.editVideoBtn.addEventListener('click', () => {
+        if (state.currentVideoId) startEditVideo(state.currentVideoId);
+      });
+      els.deleteVideoBtn.addEventListener('click', () => {
+        if (state.currentVideoId) deleteVideo(state.currentVideoId);
+      });
+      els.volumeSlider.addEventListener('input', (e) => {
+        setPlayerVolume(e.target.value);
+      });
+
+      window.addEventListener('hashchange', route);
+    }
+
+    loadState();
+    bindEvents();
+    renderHeaderStats();
+    setPlayerVolume(state.volume);
+    route();
+  </script>
+</body>
+</html>
