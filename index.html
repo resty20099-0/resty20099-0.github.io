@@ -6,83 +6,89 @@
 <title>RustX Remake</title>
 
 <style>
-:root{
-  --bg:#0f0f0f;
-  --panel:#181818;
-  --text:#fff;
-  --accent:#ff0000;
-  --border:#303030;
-}
-
 body{
   margin:0;
   font-family:Arial;
-  background:var(--bg);
-  color:var(--text);
+  background:#0f0f0f;
+  color:white;
 }
 
 /* HEADER */
 .header{
-  position:relative;
   display:flex;
-  align-items:center;
   justify-content:center;
+  align-items:center;
   padding:14px;
-  border-bottom:1px solid var(--border);
+  border-bottom:1px solid #333;
+  position:relative;
 }
 
 .logo{
   display:flex;
-  gap:10px;
   align-items:center;
-  cursor:pointer;
-  color:var(--accent);
+  gap:10px;
+  color:red;
   font-weight:bold;
   font-size:22px;
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
+  cursor:pointer;
 }
 
 .logo img{
   width:40px;
   height:40px;
   border-radius:50%;
-  border:2px solid var(--accent);
+  border:2px solid red;
 }
 
-/* GRID */
+/* CHANNELS */
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:12px;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:14px;
   padding:20px;
 }
 
 .card{
-  background:var(--panel);
-  border-radius:10px;
+  background:#181818;
+  border-radius:12px;
   overflow:hidden;
   cursor:pointer;
   transition:0.2s;
 }
 
-.card:hover{
-  transform:scale(1.03);
-}
+.card:hover{ transform:scale(1.03); }
 
 .card img{
   width:100%;
-  height:140px;
+  height:130px;
   object-fit:cover;
 }
 
 .card h3{
-  margin:0;
-  padding:10px;
+  margin:10px;
   font-size:14px;
 }
 
+/* VIDEO LIST */
+.video{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px;
+  background:#181818;
+  margin:10px 20px;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+.video img{
+  width:60px;
+  height:60px;
+  border-radius:10px;
+  object-fit:cover;
+}
+
+/* VIEW */
 #view{
   display:none;
   padding:20px;
@@ -93,11 +99,12 @@ body{
   height:500px;
 }
 
+/* BACK */
 .back{
   display:none;
   margin:10px 20px;
   padding:10px;
-  background:var(--accent);
+  background:red;
   border:none;
   color:white;
   border-radius:8px;
@@ -109,7 +116,7 @@ body{
 <body>
 
 <div class="header">
-  <div class="logo" onclick="goHome()">
+  <div class="logo" onclick="home()">
     <img src="avatar.png">
     RustX Remake
   </div>
@@ -121,107 +128,116 @@ body{
 
 <div id="view">
   <div id="player"></div>
+  <div id="videos"></div>
 </div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 
+/* =======================
+   📦 КАНАЛЫ (ТЫ РЕДАКТИРУЕШЬ ТУТ)
+======================= */
+
 const channels = [
   {
-    id:"rust",
-    name:"Rust Gameplay",
-    avatar:"https://i.pravatar.cc/150?img=1",
+    name:"Marmok",
+    avatar:"marmok.png",   // 🔥 файл с GitHub
     videos:[
       {
-        title:"Raid",
+        title:"Смешной ролик 1",
         url:"https://www.youtube.com/watch?v=ysz5S6PUM-U",
-        thumb:"https://img.youtube.com/vi/ysz5S6PUM-U/hqdefault.jpg"
+        thumb:"thumb1.jpg"
+      },
+      {
+        title:"Смешной ролик 2",
+        url:"https://www.youtube.com/watch?v=ScMzIvxBSi4",
+        thumb:"thumb2.jpg"
+      }
+    ]
+  },
+
+  {
+    name:"Rust Channel",
+    avatar:"rust.png",
+    videos:[
+      {
+        title:"Raid Base",
+        url:"https://www.youtube.com/watch?v=ysz5S6PUM-U",
+        thumb:"thumb3.jpg"
       }
     ]
   }
 ];
 
-let currentChannel = null;
-let player = null;
-let apiReady = false;
-let pendingId = null;
+let currentChannel=null;
+let player=null;
+let apiReady=false;
 
+/* =======================
+   YOUTUBE API
+======================= */
 function onYouTubeIframeAPIReady(){
-  apiReady = true;
-  if(pendingId){
-    createPlayer(pendingId);
-    pendingId = null;
-  }
+  apiReady=true;
 }
 
-function renderChannels(){
+/* =======================
+   HOME (КАНАЛЫ)
+======================= */
+function renderHome(){
   stopVideo();
 
-  currentChannel = null;
   document.getElementById("view").style.display="none";
   document.getElementById("backBtn").style.display="none";
 
-  const grid = document.getElementById("grid");
+  const grid=document.getElementById("grid");
   grid.style.display="grid";
   grid.innerHTML="";
 
-  channels.forEach(ch=>{
-    const div=document.createElement("div");
-    div.className="card";
-    div.innerHTML=`
-      <img src="${ch.avatar}">
-      <h3>${ch.name}</h3>
+  channels.forEach((ch,i)=>{
+    grid.innerHTML += `
+      <div class="card" onclick="openChannel(${i})">
+        <img src="${ch.avatar}">
+        <h3>${ch.name}</h3>
+      </div>
     `;
-    div.onclick=()=>openChannel(ch.id);
-    grid.appendChild(div);
   });
 }
 
-function openChannel(id){
-  stopVideo();
-
-  currentChannel = channels.find(c=>c.id===id);
-
-  const grid=document.getElementById("grid");
-  grid.innerHTML="";
-
-  currentChannel.videos.forEach(v=>{
-    const div=document.createElement("div");
-    div.className="card";
-    div.innerHTML=`
-      <img src="${v.thumb}">
-      <h3>${v.title}</h3>
-    `;
-    div.onclick=()=>openVideo(v.url);
-    grid.appendChild(div);
-  });
-}
-
-function openVideo(url){
-  const id = url.match(/v=([^&]+)/)[1];
+/* =======================
+   CHANNEL → VIDEO LIST
+======================= */
+function openChannel(index){
+  currentChannel = channels[index];
 
   document.getElementById("grid").style.display="none";
   document.getElementById("view").style.display="block";
   document.getElementById("backBtn").style.display="block";
 
-  if(!apiReady){
-    pendingId = id;
-    return;
-  }
+  const box=document.getElementById("videos");
+  box.innerHTML="";
 
-  createPlayer(id);
+  currentChannel.videos.forEach(v=>{
+    box.innerHTML += `
+      <div class="video" onclick="play('${v.url}')">
+        <img src="${v.thumb}">
+        <div>${v.title}</div>
+      </div>
+    `;
+  });
 }
 
-function createPlayer(id){
+/* =======================
+   PLAY VIDEO
+======================= */
+function play(url){
+  const id=url.match(/v=([^&]+)/)[1];
+
   if(player){
     player.destroy();
-    player = null;
   }
 
-  document.getElementById("player").innerHTML = "";
-
-  player = new YT.Player("player",{
+  player=new YT.Player("player",{
     videoId:id,
     playerVars:{
       autoplay:1,
@@ -230,31 +246,34 @@ function createPlayer(id){
   });
 }
 
+/* =======================
+   BACK
+======================= */
+function back(){
+  stopVideo();
+  renderHome();
+}
+
+/* =======================
+   STOP
+======================= */
 function stopVideo(){
   if(player){
-    player.stopVideo();
     player.destroy();
-    player = null;
+    player=null;
   }
   document.getElementById("player").innerHTML="";
 }
 
-function back(){
-  stopVideo();
-
-  document.getElementById("view").style.display="none";
-  document.getElementById("grid").style.display="grid";
-  document.getElementById("backBtn").style.display="none";
-
-  if(currentChannel) openChannel(currentChannel.id);
-  else renderChannels();
+/* =======================
+   HOME BUTTON
+======================= */
+function home(){
+  renderHome();
 }
 
-function goHome(){
-  renderChannels();
-}
-
-renderChannels();
+/* START */
+renderHome();
 
 </script>
 
